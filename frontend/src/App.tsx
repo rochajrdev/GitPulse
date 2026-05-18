@@ -95,7 +95,7 @@ export default function App() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${backendUrl}/api/v1/users/${username}/summary?year=${selectedYear}`);
+      const response = await fetch(`${backendUrl}/api/v1/users/${username}/summary?year=${selectedYear}&t=${Date.now()}`);
       if (!response.ok) {
         throw new Error('Falha ao carregar o resumo de contribuições');
       }
