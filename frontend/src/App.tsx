@@ -471,6 +471,7 @@ export default function App() {
         <div className="sidebar-brand">
           <div className="brand-dot"></div>
           <span className="brand-name">GitPulse</span>
+          <span className="self-hosted-badge">Self-Hosted</span>
         </div>
 
         <nav>

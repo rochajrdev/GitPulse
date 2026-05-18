@@ -225,6 +225,19 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-text-fill-color: transparent;
 }
 
+.self-hosted-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--color-github);
+  background: rgba(var(--color-github-rgb), 0.08);
+  border: 1px solid rgba(var(--color-github-rgb), 0.2);
+  padding: 2px 6px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 10px rgba(var(--color-github-rgb), 0.05);
+}
+
 .nav-menu {
   list-style: none;
   display: flex;
