@@ -112,6 +112,32 @@ export default function App() {
     }
   };
 
+  const handleSyncGitHub = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      showToast('Sincronizando dados reais com o GitHub... Por favor, aguarde.', 'info');
+      
+      const response = await fetch(`${backendUrl}/api/v1/users/${username}/sync`, {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Falha ao sincronizar dados com o GitHub');
+      }
+      
+      // Recarrega os dados do painel para exibir os dados novos
+      await fetchSummary(false);
+      
+      showToast('Histórico completo sincronizado com o GitHub!', 'success');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro na sincronização');
+      showToast('Erro ao sincronizar com o GitHub. Verifique seu token.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchSummary();
   }, [selectedYear]);
@@ -439,9 +465,9 @@ export default function App() {
             
             <button 
               className="btn-icon" 
-              onClick={() => fetchSummary(true)} 
+              onClick={handleSyncGitHub} 
               disabled={loading}
-              title="Recarregar dados"
+              title="Sincronizar com o GitHub"
             >
               <RefreshCw size={14} className={loading ? 'spin' : ''} />
               Sincronizar

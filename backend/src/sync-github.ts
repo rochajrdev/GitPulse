@@ -26,8 +26,7 @@ async function fetchAllPages<T>(baseUrl: string): Promise<T[]> {
       const response = await fetch(url, { headers });
 
       if (response.status === 409) {
-        // Repositório vazio
-        break;
+        break; // Repositório vazio
       }
 
       if (!response.ok) {
@@ -44,7 +43,6 @@ async function fetchAllPages<T>(baseUrl: string): Promise<T[]> {
 
       results.push(...data);
 
-      // Se retornou menos de 100, chegamos na última página
       if (data.length < 100) break;
       page++;
     } catch (err) {
@@ -70,7 +68,7 @@ async function insertCommit(
   await prisma.commit.create({
     data: {
       hash,
-      message: message.slice(0, 500), // limitar tamanho da mensagem
+      message: message.slice(0, 500),
       authorEmail,
       platform: 'github',
       repository: repoName,
@@ -81,31 +79,29 @@ async function insertCommit(
   return true;
 }
 
-async function main() {
+export async function syncGitHubCommits(
+  username: string = GITHUB_USERNAME,
+  name: string = USER_NAME,
+  email: string = USER_EMAIL
+) {
   console.log('🔄 Iniciando sincronização COMPLETA de commits do GitHub...');
-  console.log(`👤 Usuário: ${GITHUB_USERNAME} | E-mail: ${USER_EMAIL}`);
-  if (GITHUB_TOKEN) {
-    console.log(`🔑 Token configurado — buscando repositórios públicos E privados com histórico completo.`);
-  } else {
-    console.log(`⚠️  Sem token — apenas repositórios públicos, limitado a 100 commits por repo.`);
-    console.log(`   → Adicione GITHUB_TOKEN no arquivo backend/.env para histórico completo.`);
-  }
+  console.log(`👤 Usuário: ${username} | E-mail: ${email}`);
 
   // 1. Garantir usuário e e-mail no banco
   const user = await prisma.user.upsert({
-    where: { username: GITHUB_USERNAME },
-    update: { name: USER_NAME },
+    where: { username },
+    update: { name },
     create: {
-      username: GITHUB_USERNAME,
-      name: USER_NAME,
-      webhookToken: `token_${GITHUB_USERNAME}_${Math.random().toString(36).substring(2, 9)}`,
+      username,
+      name,
+      webhookToken: `token_${username}_${Math.random().toString(36).substring(2, 9)}`,
     },
   });
 
   await prisma.emailAlias.upsert({
-    where: { email: USER_EMAIL },
+    where: { email },
     update: {},
-    create: { email: USER_EMAIL, userId: user.id },
+    create: { email, userId: user.id },
   });
 
   console.log(`\n✅ Usuário '${user.username}' pronto no banco.`);
@@ -116,7 +112,7 @@ async function main() {
   // 2. Buscar todos os repositórios (públicos + privados com token)
   const reposUrl = GITHUB_TOKEN
     ? `https://api.github.com/user/repos?type=all&sort=updated`
-    : `https://api.github.com/users/${GITHUB_USERNAME}/repos?type=public&sort=updated`;
+    : `https://api.github.com/users/${username}/repos?type=public&sort=updated`;
 
   console.log(`\n📂 Buscando repositórios...`);
   const repos = await fetchAllPages<any>(reposUrl);
@@ -127,7 +123,6 @@ async function main() {
     const repoName = repo.full_name;
     const isPrivate = repo.private ? '🔒' : '🌐';
     
-    // Pular repositórios forkados — eles herdam commits do repo pai e inflam a contagem
     if (repo.fork) {
       console.log(`   ↪️  ${repoName} → pulado (fork do repositório pai).`);
       continue;
@@ -135,7 +130,7 @@ async function main() {
 
     process.stdout.write(`   ${isPrivate} ${repoName} → `);
 
-    const commitsUrl = `https://api.github.com/repos/${repoName}/commits?author=${GITHUB_USERNAME}`;
+    const commitsUrl = `https://api.github.com/repos/${repoName}/commits?author=${username}`;
     const commits = await fetchAllPages<any>(commitsUrl);
 
     if (commits.length === 0) {
@@ -147,13 +142,12 @@ async function main() {
     for (const c of commits) {
       const hash = c.sha;
       const message = c.commit?.message || '';
-      const authorEmail = c.commit?.author?.email || USER_EMAIL;
+      const authorEmail = c.commit?.author?.email || email;
       const dateStr = c.commit?.author?.date || c.commit?.committer?.date;
       const timestamp = dateStr ? new Date(dateStr) : new Date();
 
       if (!hash) continue;
       
-      // Pular merge commits (têm mais de 1 parent) — evita overcounting
       const parents: any[] = c.parents || [];
       if (parents.length > 1) { totalSkipped++; continue; }
 
@@ -170,15 +164,13 @@ async function main() {
   }
 
   // 4. FASE 2: Search API — capturar commits em repos de TERCEIROS
-  // Isso cobre as contribuições que o GitHub conta mas não aparecem nos seus próprios repos
   console.log(`\n🔍 Fase 2: Buscando contribuições em repositórios de terceiros via Search API...`);
   
   const currentYear = new Date().getFullYear();
-  // Busca todos os anos com commits (por ano para superar o limite de 1000 da search API)
-  const years = [currentYear - 1, currentYear]; // ano passado + atual
+  const years = [currentYear - 1, currentYear];
   
   for (const year of years) {
-    const searchUrl = `https://api.github.com/search/commits?q=author:${GITHUB_USERNAME}+author-date:${year}-01-01..${year}-12-31&sort=author-date&order=desc`;
+    const searchUrl = `https://api.github.com/search/commits?q=author:${username}+author-date:${year}-01-01..${year}-12-31&sort=author-date&order=desc`;
     const searchHeaders = { ...headers, 'Accept': 'application/vnd.github.cloak-preview+json' };
     
     let searchPage = 1;
@@ -190,7 +182,7 @@ async function main() {
         const response = await fetch(url, { headers: searchHeaders });
         
         if (!response.ok) {
-          if (response.status === 422) break; // página fora do limite
+          if (response.status === 422) break;
           break;
         }
         
@@ -202,7 +194,7 @@ async function main() {
         for (const c of items) {
           const hash = c.sha;
           const message = c.commit?.message || '';
-          const authorEmail = c.commit?.author?.email || USER_EMAIL;
+          const authorEmail = c.commit?.author?.email || email;
           const dateStr = c.commit?.author?.date;
           const timestamp = dateStr ? new Date(dateStr) : new Date();
           const repoName = c.repository?.full_name || 'unknown/unknown';
@@ -227,14 +219,18 @@ async function main() {
   console.log(`\n🎉 Sincronização completa finalizada!`);
   console.log(`   🟩 Commits novos no banco: ${totalInserted}`);
   console.log(`   🟨 Commits já existentes (ignorados): ${totalSkipped}`);
-  console.log(`   📊 Total real no seu banco agora: ${totalInserted + totalSkipped}`);
+
+  return { totalInserted, totalSkipped };
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Erro durante a sincronização:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Execução direta (CLI)
+if (process.argv[1]?.endsWith('sync-github.ts') || process.argv[1]?.endsWith('sync-github.js')) {
+  syncGitHubCommits()
+    .catch((e) => {
+      console.error('❌ Erro durante a sincronização:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

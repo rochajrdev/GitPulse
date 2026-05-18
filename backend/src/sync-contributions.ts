@@ -6,11 +6,6 @@ const USER_NAME       = process.env.USER_NAME       || 'Adailson';
 const USER_EMAIL      = process.env.USER_EMAIL      || 'juniorbing0317@gmail.com';
 const GITHUB_TOKEN    = process.env.GITHUB_TOKEN    || '';
 
-if (!GITHUB_TOKEN) {
-  console.error('❌ GITHUB_TOKEN não configurado no .env. A API GraphQL do GitHub exige autenticação.');
-  process.exit(1);
-}
-
 // Query GraphQL do GitHub — retorna o contributionCalendar exato do perfil
 const CONTRIBUTION_QUERY = `
   query($username: String!, $from: DateTime!, $to: DateTime!) {
@@ -33,6 +28,10 @@ const CONTRIBUTION_QUERY = `
 `;
 
 async function graphqlRequest(query: string, variables: Record<string, any>) {
+  if (!GITHUB_TOKEN) {
+    throw new Error('GITHUB_TOKEN não configurado no .env.');
+  }
+
   const response = await fetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
@@ -54,33 +53,39 @@ async function graphqlRequest(query: string, variables: Record<string, any>) {
   return json.data;
 }
 
-async function main() {
+export async function syncGitHubContributions(
+  username: string = GITHUB_USERNAME,
+  name: string = USER_NAME,
+  email: string = USER_EMAIL
+) {
   console.log('📡 Sincronizando dados EXATOS do GitHub Contribution Calendar via GraphQL...');
-  console.log(`👤 Usuário: ${GITHUB_USERNAME}`);
+  console.log(`👤 Usuário: ${username}`);
+
+  if (!GITHUB_TOKEN) {
+    throw new Error('❌ GITHUB_TOKEN não configurado no .env. A API GraphQL do GitHub exige autenticação.');
+  }
 
   // Garantir usuário no banco
   const user = await prisma.user.upsert({
-    where: { username: GITHUB_USERNAME },
-    update: { name: USER_NAME },
+    where: { username },
+    update: { name },
     create: {
-      username: GITHUB_USERNAME,
-      name: USER_NAME,
-      webhookToken: `token_${GITHUB_USERNAME}_${Math.random().toString(36).substring(2, 9)}`,
+      username,
+      name,
+      webhookToken: `token_${username}_${Math.random().toString(36).substring(2, 9)}`,
     },
   });
 
   await prisma.emailAlias.upsert({
-    where: { email: USER_EMAIL },
+    where: { email },
     update: {},
-    create: { email: USER_EMAIL, userId: user.id },
+    create: { email, userId: user.id },
   });
 
-  // Busca por ano para cobrir histórico completo (a API limita a 1 ano por request)
   const currentYear = new Date().getFullYear();
   const yearsToFetch = [currentYear - 2, currentYear - 1, currentYear];
 
   let totalInserted = 0;
-  let totalUpdated  = 0;
   let grandTotal    = 0;
 
   for (const year of yearsToFetch) {
@@ -93,7 +98,7 @@ async function main() {
 
     try {
       const data = await graphqlRequest(CONTRIBUTION_QUERY, {
-        username: GITHUB_USERNAME,
+        username,
         from,
         to,
       });
@@ -124,7 +129,7 @@ async function main() {
         for (const day of week.contributionDays) {
           if (day.contributionCount > 0) {
             days.push({
-              date:   day.date, // já vem no formato YYYY-MM-DD
+              date:   day.date,
               count:  day.contributionCount,
               source: 'github',
               userId: user.id,
@@ -149,13 +154,18 @@ async function main() {
   console.log(`\n🎉 Sincronização do contribution calendar finalizada!`);
   console.log(`   📊 Total histórico de contribuições: ${grandTotal}`);
   console.log(`   🟩 Dias com contribuições salvos: ${totalInserted}`);
+
+  return { grandTotal, totalInserted };
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Erro fatal:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Execução direta (CLI)
+if (process.argv[1]?.endsWith('sync-contributions.ts') || process.argv[1]?.endsWith('sync-contributions.js')) {
+  syncGitHubContributions()
+    .catch((e) => {
+      console.error('❌ Erro fatal:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

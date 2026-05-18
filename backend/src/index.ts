@@ -2,6 +2,8 @@ import fastify from 'fastify';
 import cors from '@fastify/cors';
 import { z } from 'zod';
 import { prisma } from './db.js';
+import { syncGitHubContributions } from './sync-contributions.js';
+import { syncGitHubCommits } from './sync-github.js';
 
 const server = fastify({
   logger: true,
@@ -106,6 +108,54 @@ server.post('/api/v1/users/:username/emails', async (request, reply) => {
     return { error: error instanceof Error ? error.message : 'Invalid request' };
   }
 });
+
+// ==========================================
+// ROTA: Sincronizar Histórico GitHub
+// ==========================================
+server.post('/api/v1/users/:username/sync', async (request, reply) => {
+  try {
+    const { username } = request.params as { username: string };
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      include: { emailAliases: true },
+    });
+
+    if (!user) {
+      reply.code(404);
+      return { error: 'Usuário não encontrado' };
+    }
+
+    const email = user.emailAliases[0]?.email || 'juniorbing0317@gmail.com';
+
+    // 1. Sincroniza dados do contribution calendar via GraphQL
+    let contributionStats = { grandTotal: 0, totalInserted: 0 };
+    try {
+      contributionStats = await syncGitHubContributions(user.username, user.name, email);
+    } catch (err: any) {
+      server.log.error('Erro ao sincronizar contribution calendar: ' + err.message);
+    }
+
+    // 2. Sincroniza commits individuais dos repos
+    let commitStats = { totalInserted: 0, totalSkipped: 0 };
+    try {
+      commitStats = await syncGitHubCommits(user.username, user.name, email);
+    } catch (err: any) {
+      server.log.error('Erro ao sincronizar commits do GitHub: ' + err.message);
+    }
+
+    return {
+      success: true,
+      message: 'Sincronização com o GitHub concluída com sucesso!',
+      contributionStats,
+      commitStats,
+    };
+  } catch (error) {
+    reply.code(500);
+    return { error: error instanceof Error ? error.message : 'Erro interno do servidor' };
+  }
+});
+
 
 // ==========================================
 // ROTA: Webhooks de Integração (GitHub / GitLab / Simulator)
