@@ -11,8 +11,9 @@ model User {
   username     String       @unique
   name         String
   webhookToken String       @unique
-  emailAliases EmailAlias[]
-  commits      Commit[]
+  emailAliases    EmailAlias[]
+  commits         Commit[]
+  contributionDays ContributionDay[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -39,4 +40,17 @@ model Commit {
 
   @@index([userId])
   @@index([timestamp])
+}
+
+model ContributionDay {
+  id        String   @id @default(uuid())
+  date      String   // YYYY-MM-DD
+  count     Int
+  source    String   @default("github") // plataforma de origem
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date, source])
+  @@index([userId])
 }

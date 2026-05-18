@@ -297,7 +297,20 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     },
   });
 
-  // Agrupa os commits por dia
+  // Tenta usar ContributionDay (dados exatos do GitHub) como fonte principal do heatmap
+  const contributionDays = await prisma.contributionDay.findMany({
+    where: {
+      userId: user.id,
+      source: 'github',
+      date: {
+        gte: `${currentYear}-01-01`,
+        lte: `${currentYear}-12-31`,
+      },
+    },
+    orderBy: { date: 'asc' },
+  });
+
+  // Agrupa os commits por dia (mantido para breakdown por plataforma)
   const dailyCommits: Record<string, {
     total: number;
     github: number;
@@ -313,29 +326,47 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     local: 0,
   };
 
-  commits.forEach((commit: any) => {
-    // Formata a data em YYYY-MM-DD
-    const dateStr = commit.timestamp.toISOString().split('T')[0];
+  if (contributionDays.length > 0) {
+    // ✅ MODO PRECISO: usar dados exatos do GitHub Contribution Calendar
+    contributionDays.forEach((cd: any) => {
+      dailyCommits[cd.date] = {
+        total:     cd.count,
+        github:    cd.count, // todos os dados vêm do GitHub
+        gitlab:    0,
+        bitbucket: 0,
+        local:     0,
+      };
+      platformCount.github += cd.count;
+    });
+  } else {
+    // ⚠️ FALLBACK: usar commits individuais se não houver contribution calendar
+    commits.forEach((commit: any) => {
+      const localDate = new Date(commit.timestamp);
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
 
-    if (!dailyCommits[dateStr]) {
-      dailyCommits[dateStr] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, local: 0 };
-    }
+      if (!dailyCommits[dateStr]) {
+        dailyCommits[dateStr] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, local: 0 };
+      }
 
-    dailyCommits[dateStr].total++;
-    
-    const p = commit.platform.toLowerCase();
-    if (p in dailyCommits[dateStr]) {
-      dailyCommits[dateStr][p as keyof typeof dailyCommits[string]]++;
-    } else {
-      dailyCommits[dateStr].local++; // fallback
-    }
+      dailyCommits[dateStr].total++;
 
-    if (p in platformCount) {
-      platformCount[p]++;
-    } else {
-      platformCount.local++;
-    }
-  });
+      const p = commit.platform.toLowerCase();
+      if (p in dailyCommits[dateStr]) {
+        dailyCommits[dateStr][p as keyof typeof dailyCommits[string]]++;
+      } else {
+        dailyCommits[dateStr].local++;
+      }
+
+      if (p in platformCount) {
+        platformCount[p]++;
+      } else {
+        platformCount.local++;
+      }
+    });
+  }
 
   // Determina a plataforma mais ativa
   let mostActivePlatform = 'Nenhum';

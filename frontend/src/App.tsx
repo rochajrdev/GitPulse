@@ -1,23 +1,15 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Activity, 
-  Terminal, 
-  Settings, 
   Layers, 
   Copy, 
   Check, 
   Flame, 
   Calendar, 
-  ChevronRight, 
-  Info, 
   RefreshCw, 
-  Sliders, 
   Mail, 
-  Plus, 
   Award, 
-  TrendingUp,
-  GitBranch,
-  GitPullRequest
+  TrendingUp
 } from 'lucide-react';
 
 // ==========================================
@@ -58,15 +50,8 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
-const GithubIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-github">
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path>
-    <path d="M9 18c-4.51 2-5-2-7-2"></path>
-  </svg>
-);
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'integrations' | 'simulator'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'integrations'>('dashboard');
   const [userData, setUserData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,17 +70,6 @@ export default function App() {
   // Estado para Guia de Integração
   const [activeIntTab, setActiveIntTab] = useState<'github' | 'gitlab' | 'bitbucket' | 'local'>('github');
 
-  // Estados do Formulário do Simulador
-  const [simPlatform, setSimPlatform] = useState<'github' | 'gitlab' | 'bitbucket' | 'local'>('github');
-  const [simRepo, setSimRepo] = useState('rochajrdev/GitPulse');
-  const [simDate, setSimDate] = useState('2026-05-18');
-  const [simCommits, setSimCommits] = useState(3);
-  const [simAuthorEmail, setSimAuthorEmail] = useState('rochajr.dev@gmail.com');
-  const [simulating, setSimulating] = useState(false);
-  const [consoleOutput, setConsoleOutput] = useState<string[]>([
-    '👾 Console do GitPulse pronto para receber envios simulados...',
-  ]);
-
   // Referência do Tooltip Portal
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
@@ -111,7 +85,7 @@ export default function App() {
     commits: null,
   });
 
-  const backendUrl = 'http://localhost:3000';
+  const backendUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
   const username = 'rochajrdev';
 
   // ==========================================
@@ -157,79 +131,6 @@ export default function App() {
     setCopied(true);
     showToast('Webhook copiado para a área de transferência!', 'success');
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  // ==========================================
-  // SIMULADOR: DISPARAR PUSH DE TESTE
-  // ==========================================
-  const handleSimulatePush = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userData) return;
-
-    setSimulating(true);
-    const logs = [
-      `🚀 Iniciando simulação de push para a plataforma [${simPlatform.toUpperCase()}]...`,
-      `📦 Repositório: ${simRepo}`,
-      `📅 Data informada: ${simDate}`,
-      `👤 Autor: ${simAuthorEmail}`,
-      `⚡ Enviando payload para: ${backendUrl}/api/v1/webhooks/${userData.user.webhookToken}`,
-    ];
-    setConsoleOutput(logs);
-
-    try {
-      // Gera commits falsos baseados nas configurações do formulário
-      const fakeCommits = Array.from({ length: simCommits }).map((_, idx) => ({
-        hash: Math.random().toString(16).substring(2, 9) + Math.random().toString(16).substring(2, 9),
-        message: `simulated: commit incremental de teste #${idx + 1}`,
-        authorEmail: simAuthorEmail,
-        timestamp: new Date(`${simDate}T12:00:00.000Z`).toISOString(),
-        repository: simRepo,
-      }));
-
-      const payload = {
-        simulated: true,
-        platform: simPlatform,
-        commits: fakeCommits,
-      };
-
-      const res = await fetch(`${backendUrl}/api/v1/webhooks/${userData.user.webhookToken}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao processar webhook simulado');
-      }
-
-      setConsoleOutput(prev => [
-        ...prev,
-        `📡 Resposta da API recebida (${res.status}): OK`,
-        `🟩 Mensagem: ${data.message}`,
-        `🟩 Plataforma detectada: ${data.platform}`,
-        `🟩 Commits encontrados no Push: ${data.commitsFound}`,
-        `🟩 Commits que coincidiram com e-mails cadastrados: ${data.commitsMatched}`,
-        `📥 Total de novos commits salvos no banco: ${data.importedCount}`,
-        `✨ Processo finalizado com sucesso!`,
-      ]);
-
-      showToast(`Push simulado! ${data.importedCount} novos commits importados.`, 'success');
-      // Recarrega os dados imediatamente
-      fetchSummary();
-    } catch (err) {
-      setConsoleOutput(prev => [
-        ...prev,
-        `❌ ERRO NO SIMULADOR: ${err instanceof Error ? err.message : 'Conexão rejeitada'}`,
-        `⚠️ Certifique-se de que o backend na porta 3000 está rodando.`,
-      ]);
-      showToast('Falha na simulação de push.', 'error');
-    } finally {
-      setSimulating(false);
-    }
   };
 
   // ==========================================
@@ -295,7 +196,6 @@ export default function App() {
         if (prev === null) {
           temp = 1;
         } else {
-          const diff = Math.ceil(Math.abs(curr.getTime() - prev.getTime()) / (1000 * 30 * 120 * 24 * 20)); // simplificado
           const diffDays = Math.ceil(Math.abs(curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
           if (diffDays === 1) {
             temp++;
@@ -494,15 +394,6 @@ export default function App() {
                 Integrações
               </button>
             </li>
-            <li>
-              <button 
-                className={`nav-item ${activeTab === 'simulator' ? 'active' : ''}`}
-                onClick={() => setActiveTab('simulator')}
-              >
-                <Terminal size={18} />
-                Simulador Push
-              </button>
-            </li>
           </ul>
         </nav>
 
@@ -527,12 +418,10 @@ export default function App() {
             <h1>
               {activeTab === 'dashboard' && 'Visão Geral'}
               {activeTab === 'integrations' && 'Integrações'}
-              {activeTab === 'simulator' && 'Painel do Desenvolvedor'}
             </h1>
             <span className="page-subtitle">
               {activeTab === 'dashboard' && 'Monitore suas contribuições consolidadas em tempo real.'}
               {activeTab === 'integrations' && 'Configure seus Webhooks e conecte seus provedores Git.'}
-              {activeTab === 'simulator' && 'Simule pushes locais e Webhooks instantaneamente para validar seus dados.'}
             </span>
           </div>
 
@@ -1015,145 +904,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ==========================================
-            TAB: SIMULATOR
-            ========================================== */}
-        {activeTab === 'simulator' && userData && (
-          <div className="glass-panel simulator-card animate-fade-in">
-            <h3 className="section-title" style={{ marginBottom: '20px' }}>Simular Git Push (Developer Utility)</h3>
-            
-            <form onSubmit={handleSimulatePush}>
-              <div className="sim-grid">
-                
-                {/* PLATAFORMA SELECTOR */}
-                <div className="form-group">
-                  <span className="form-label">Selecione a Plataforma</span>
-                  <div className="platform-select-grid">
-                    <button 
-                      type="button"
-                      className={`platform-select-btn ${simPlatform === 'github' ? 'active github' : ''}`}
-                      onClick={() => { setSimPlatform('github'); setSimRepo('rochajrdev/GitPulse'); }}
-                    >
-                      <GithubIcon />
-                      GitHub
-                    </button>
-                    <button 
-                      type="button"
-                      className={`platform-select-btn ${simPlatform === 'gitlab' ? 'active gitlab' : ''}`}
-                      onClick={() => { setSimPlatform('gitlab'); setSimRepo('company/enterprise-service'); }}
-                    >
-                      <GitBranch />
-                      GitLab
-                    </button>
-                    <button 
-                      type="button"
-                      className={`platform-select-btn ${simPlatform === 'bitbucket' ? 'active bitbucket' : ''}`}
-                      onClick={() => { setSimPlatform('bitbucket'); setSimRepo('freelance/e-commerce'); }}
-                    >
-                      <GitPullRequest />
-                      Bitbucket
-                    </button>
-                    <button 
-                      type="button"
-                      className={`platform-select-btn ${simPlatform === 'local' ? 'active local' : ''}`}
-                      onClick={() => { setSimPlatform('local'); setSimRepo('desktop/quick-scripts'); }}
-                    >
-                      <Terminal />
-                      Local
-                    </button>
-                  </div>
-                </div>
-
-                {/* E-MAIL DE AUTOR */}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="authorEmail">E-mail do Autor do Commit</label>
-                  <select 
-                    id="authorEmail"
-                    className="form-input"
-                    value={simAuthorEmail}
-                    onChange={(e) => setSimAuthorEmail(e.target.value)}
-                  >
-                    {userData.user.emailAliases.map(email => (
-                      <option key={email} value={email}>{email} (Cadastrado)</option>
-                    ))}
-                    <option value="desconhecido@outro.com">desconhecido@outro.com (Ignorado pela API)</option>
-                  </select>
-                </div>
-
-                {/* NOME DO REPOSITÓRIO */}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="repoName">Nome do Repositório</label>
-                  <input 
-                    type="text" 
-                    id="repoName"
-                    className="form-input" 
-                    value={simRepo}
-                    onChange={(e) => setSimRepo(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* QUANTIDADE DE COMMITS */}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="commitQty">Quantidade de Commits no Push</label>
-                  <input 
-                    type="number" 
-                    id="commitQty"
-                    className="form-input"
-                    min="1" 
-                    max="30"
-                    value={simCommits}
-                    onChange={(e) => setSimCommits(parseInt(e.target.value))}
-                    required
-                  />
-                </div>
-
-                {/* DATA DOS COMMITS */}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="commitDate">Data dos Commits</label>
-                  <input 
-                    type="date" 
-                    id="commitDate"
-                    className="form-input" 
-                    value={simDate}
-                    onChange={(e) => setSimDate(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* ESPAÇO VAZIO OU NOTA */}
-                <div style={{ display: 'flex', alignItems: 'center', padding: '12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <Info size={16} style={{ color: 'var(--color-github)', flexShrink: 0, marginRight: '10px' }} />
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    <strong>Dica de Teste:</strong> Escolha uma data vazia no mapa de calor e dispare commits para ver o quadrado mudar de cor dinamicamente na hora!
-                  </span>
-                </div>
-              </div>
-
-              <button 
-                type="submit" 
-                className="btn-primary" 
-                disabled={simulating}
-                style={{ width: '100%' }}
-              >
-                <Terminal size={18} />
-                {simulating ? 'PROCESSANDO WEBHOOK...' : 'DISPARAR PUSH SIMULADO'}
-              </button>
-            </form>
-
-            {/* OUTPUT DA CONSOLE */}
-            <section className="console-output">
-              <span className="form-label" style={{ marginBottom: '8px', display: 'block' }}>Output da API e Event Logs</span>
-              <div className="console-box">
-                {consoleOutput.map((line, index) => (
-                  <div key={index} style={{ marginBottom: '4px', wordBreak: 'break-all' }}>
-                    {line}
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        )}
       </main>
 
       {/* PORTAL DO TOOLTIP FLUTUANTE */}

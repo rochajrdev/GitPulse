@@ -7,6 +7,10 @@
     "dev": "tsx watch src/index.ts",
     "db:setup": "prisma migrate dev && tsx src/seed.ts",
     "db:seed": "tsx src/seed.ts",
+    "db:clean": "tsx src/clean-db.ts",
+    "db:sync": "tsx src/sync-github.ts",
+    "db:sync-contributions": "tsx src/sync-contributions.ts",
+    "db:sync-all": "tsx src/sync-contributions.ts && tsx src/sync-github.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
