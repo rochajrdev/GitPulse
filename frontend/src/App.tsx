@@ -603,7 +603,8 @@ export default function App() {
 
       {/* ÁREA DE CONTEÚDO PRINCIPAL */}
       <main className={`main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        {/* CABEÇALHO */}
+        <div className="main-content-inner">
+          {/* CABEÇALHO */}
         <header className="top-header">
           <div className="page-title-group">
             <h1>
@@ -1223,6 +1224,7 @@ export default function App() {
             </section>
           </div>
         )}
+        </div>
 
       </main>
 
