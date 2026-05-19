@@ -9,7 +9,12 @@ import {
   RefreshCw, 
   Mail, 
   Award, 
-  TrendingUp
+  TrendingUp,
+  Menu,
+  Settings,
+  Plus,
+  Trash2,
+  User
 } from 'lucide-react';
 
 // ==========================================
@@ -43,6 +48,7 @@ interface Summary {
   user: User;
   stats: Stats;
   dailyCommits: Record<string, DailyCommit>;
+  years: number[];
 }
 
 interface Toast {
@@ -51,11 +57,14 @@ interface Toast {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'integrations'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'integrations' | 'settings'>('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [isAddingEmail, setIsAddingEmail] = useState(false);
   const [userData, setUserData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const [selectedYear, setSelectedYear] = useState<number | 'last-year'>('last-year');
   const [toast, setToast] = useState<Toast | null>(null);
   const [copied, setCopied] = useState(false);
   const [isSyncingCards, setIsSyncingCards] = useState(false);
@@ -113,31 +122,70 @@ export default function App() {
     }
   };
 
-  const handleSyncGitHub = async () => {
+  // ==========================================
+  // GERENCIAMENTO DE E-MAILS ALIASES
+  // ==========================================
+  const handleAddEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmail.trim() || !userData) return;
+
+    try {
+      setIsAddingEmail(true);
+      const response = await fetch(`${backendUrl}/api/v1/users/${username}/emails`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: newEmail.trim() }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao adicionar e-mail');
+      }
+
+      showToast('E-mail alias cadastrado com sucesso!', 'success');
+      setNewEmail('');
+      await fetchSummary(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Falha ao adicionar e-mail', 'error');
+    } finally {
+      setIsAddingEmail(false);
+    }
+  };
+
+  const handleDeleteEmail = async (emailToDelete: string) => {
+    if (!userData) return;
+
+    if (userData.user.emailAliases.length <= 1) {
+      showToast('Não é possível remover o único e-mail cadastrado.', 'error');
+      return;
+    }
+
+    if (!window.confirm(`Tem certeza que deseja remover o e-mail "${emailToDelete}"?`)) {
+      return;
+    }
+
     try {
       setLoading(true);
-      setError(null);
-      showToast('Sincronizando dados reais com o GitHub... Por favor, aguarde.', 'info');
-      
-      const response = await fetch(`${backendUrl}/api/v1/users/${username}/sync`, {
-        method: 'POST'
+      const response = await fetch(`${backendUrl}/api/v1/users/${username}/emails?email=${encodeURIComponent(emailToDelete)}`, {
+        method: 'DELETE',
       });
-      
+
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error('Falha ao sincronizar dados com o GitHub');
+        throw new Error(data.error || 'Erro ao remover e-mail');
       }
-      
-      // Recarrega os dados do painel para exibir os dados novos
+
+      showToast('E-mail removido com sucesso!', 'success');
       await fetchSummary(false);
-      
-      showToast('Histórico completo sincronizado com o GitHub!', 'success');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro na sincronização');
-      showToast('Erro ao sincronizar com o GitHub. Verifique seu token.', 'error');
+      showToast(err instanceof Error ? err.message : 'Falha ao remover e-mail', 'error');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleSyncCards = async () => {
     if (isSyncingCards) return;
@@ -329,11 +377,27 @@ export default function App() {
   // ==========================================
   const heatmapGrid = useMemo(() => {
     const days: Date[] = [];
-    // Gera todos os dias do ano selecionado
-    const startDate = new Date(selectedYear, 0, 1);
-    const endDate = new Date(selectedYear, 11, 31);
-    const curr = new Date(startDate);
+    let startDate: Date;
+    let endDate: Date;
 
+    const now = new Date();
+
+    if (selectedYear === 'last-year') {
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+
+      // Retrocede até o domingo anterior mais próximo para alinhar as semanas no grid do heatmap
+      const startDayOfWeek = startDate.getDay();
+      if (startDayOfWeek > 0) {
+        startDate.setDate(startDate.getDate() - startDayOfWeek);
+      }
+    } else {
+      const yearNum = typeof selectedYear === 'string' ? parseInt(selectedYear) : selectedYear;
+      startDate = new Date(yearNum, 0, 1);
+      endDate = new Date(yearNum, 11, 31);
+    }
+
+    const curr = new Date(startDate);
     while (curr <= endDate) {
       days.push(new Date(curr));
       curr.setDate(curr.getDate() + 1);
@@ -354,6 +418,39 @@ export default function App() {
       };
     });
   }, [selectedYear]);
+
+  // Rótulos dinâmicos dos meses baseados na coluna onde o mês começa na grade
+  const monthLabels = useMemo(() => {
+    const labels: { text: string; x: number }[] = [];
+    const seenMonths = new Set<string>();
+
+    heatmapGrid.forEach((day) => {
+      const monthName = day.date.toLocaleDateString('pt-BR', { month: 'short' });
+      const formattedMonth = monthName.replace('.', '').substring(0, 3);
+      const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
+      const monthYearKey = `${day.date.getMonth()}-${day.date.getFullYear()}`;
+
+      if (!seenMonths.has(monthYearKey)) {
+        seenMonths.add(monthYearKey);
+        const xCoord = 35 + day.col * 14;
+        labels.push({
+          text: capitalizedMonth,
+          x: xCoord
+        });
+      }
+    });
+
+    const filteredLabels: { text: string; x: number }[] = [];
+    let lastX = -100;
+    labels.forEach((label) => {
+      if (label.x - lastX > 30) {
+        filteredLabels.push(label);
+        lastX = label.x;
+      }
+    });
+
+    return filteredLabels;
+  }, [heatmapGrid]);
 
   // Determina a cor com base nos filtros dinâmicos
   const getSquareColor = (dateStr: string) => {
@@ -442,7 +539,17 @@ export default function App() {
       </div>
 
       {/* BARRA LATERAL FIXA (SIDEBAR) */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar-header-toggle">
+          <button 
+            className="sidebar-toggle-btn"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            title={isSidebarCollapsed ? "Expandir Menu" : "Recolher Menu"}
+          >
+            <Menu size={20} />
+          </button>
+        </div>
+
         <div className="sidebar-brand">
           <div className="brand-dot"></div>
           <span className="brand-name">GitPulse</span>
@@ -457,7 +564,7 @@ export default function App() {
                 onClick={() => setActiveTab('dashboard')}
               >
                 <Activity size={18} />
-                Dashboard
+                <span>Dashboard</span>
               </button>
             </li>
             <li>
@@ -466,7 +573,16 @@ export default function App() {
                 onClick={() => setActiveTab('integrations')}
               >
                 <Layers size={18} />
-                Integrações
+                <span>Integrações</span>
+              </button>
+            </li>
+            <li>
+              <button 
+                className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings')}
+              >
+                <Settings size={18} />
+                <span>Configurações</span>
               </button>
             </li>
           </ul>
@@ -486,17 +602,19 @@ export default function App() {
       </aside>
 
       {/* ÁREA DE CONTEÚDO PRINCIPAL */}
-      <main className="main-content">
+      <main className={`main-content ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         {/* CABEÇALHO */}
         <header className="top-header">
           <div className="page-title-group">
             <h1>
               {activeTab === 'dashboard' && 'Visão Geral'}
               {activeTab === 'integrations' && 'Integrações'}
+              {activeTab === 'settings' && 'Configurações'}
             </h1>
             <span className="page-subtitle">
               {activeTab === 'dashboard' && 'Monitore suas contribuições consolidadas em tempo real.'}
               {activeTab === 'integrations' && 'Configure seus Webhooks e conecte seus provedores Git.'}
+              {activeTab === 'settings' && 'Gerencie seu perfil de desenvolvedor e e-mails vinculados.'}
             </span>
           </div>
 
@@ -505,10 +623,17 @@ export default function App() {
               <select 
                 className="year-selector" 
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedYear(val === 'last-year' ? 'last-year' : parseInt(val));
+                }}
               >
-                <option value={2026}>Ano de 2026</option>
-                <option value={2025}>Ano de 2025</option>
+                <option value="last-year">No último ano</option>
+                {userData?.years?.map((yr) => (
+                  <option key={yr} value={yr}>
+                    Ano de {yr}
+                  </option>
+                ))}
               </select>
             )}
             
@@ -571,7 +696,7 @@ export default function App() {
                   ) : (
                     <>
                       <TrendingUp size={12} style={{ color: 'var(--color-github)' }} />
-                      <span>no ano de {selectedYear}</span>
+                      <span>{selectedYear === 'last-year' ? 'no último ano' : `no ano de ${selectedYear}`}</span>
                     </>
                   )}
                 </div>
@@ -624,7 +749,7 @@ export default function App() {
                   {isSyncingCards ? (
                     <span className="skeleton-shimmer footer-shimmer"></span>
                   ) : (
-                    <span>🏆 seu recorde histórico em {selectedYear}</span>
+                    <span>🏆 seu recorde histórico {selectedYear === 'last-year' ? 'no último ano' : `em ${selectedYear}`}</span>
                   )}
                 </div>
               </div>
@@ -705,18 +830,11 @@ export default function App() {
                   className="heatmap-svg"
                 >
                   {/* Month Labels */}
-                  <text x="35" y="12" className="month-label">Jan</text>
-                  <text x="100" y="12" className="month-label">Fev</text>
-                  <text x="165" y="12" className="month-label">Mar</text>
-                  <text x="230" y="12" className="month-label">Abr</text>
-                  <text x="295" y="12" className="month-label">Mai</text>
-                  <text x="360" y="12" className="month-label">Jun</text>
-                  <text x="425" y="12" className="month-label">Jul</text>
-                  <text x="490" y="12" className="month-label">Ago</text>
-                  <text x="555" y="12" className="month-label">Set</text>
-                  <text x="620" y="12" className="month-label">Out</text>
-                  <text x="685" y="12" className="month-label">Nov</text>
-                  <text x="750" y="12" className="month-label">Dez</text>
+                  {monthLabels.map((label, i) => (
+                    <text key={i} x={label.x} y="12" className="month-label">
+                      {label.text}
+                    </text>
+                  ))}
 
                   {/* Weekday Labels (Seg, Qua, Sex) */}
                   <text x="10" y="41" className="weekday-label">Seg</text>
@@ -1018,6 +1136,91 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ==========================================
+            TAB: SETTINGS
+            ========================================== */}
+        {activeTab === 'settings' && userData && (
+          <div className="settings-container animate-fade-in">
+            <section className="glass-panel settings-section">
+              <h3 className="section-title">Perfil do Desenvolvedor</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '24px' }}>
+                Estes são seus dados básicos de identificação sincronizados na plataforma.
+              </p>
+
+              <div className="settings-grid">
+                <div className="settings-profile-card">
+                  <div className="settings-profile-field">
+                    <span className="settings-profile-label">Nome Completo</span>
+                    <span className="settings-profile-value">{userData.user.name}</span>
+                  </div>
+                  <div className="settings-profile-field">
+                    <span className="settings-profile-label">Nome de Usuário</span>
+                    <span className="settings-profile-value">@{userData.user.username}</span>
+                  </div>
+                </div>
+
+                <div className="settings-profile-card" style={{ justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div className="user-avatar" style={{ width: '60px', height: '60px', fontSize: '1.4rem' }}>
+                      {userData.user.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '1.1rem', fontWeight: 600 }}>{userData.user.name}</h4>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Desenvolvedor Ativo</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="glass-panel settings-section">
+              <h3 className="section-title">Gerenciador de E-mails (Aliases)</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '16px' }}>
+                Commits enviados via Webhook que possuírem qualquer um dos e-mails de autor abaixo serão consolidados no seu perfil.
+              </p>
+
+              <div className="email-list-container">
+                {userData.user.emailAliases.map((email) => (
+                  <div key={email} className="email-item-row">
+                    <div className="email-text-box">
+                      <span className="email-dot-active"></span>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>{email}</span>
+                    </div>
+                    <button
+                      className="btn-delete-email"
+                      title="Remover e-mail"
+                      disabled={userData.user.emailAliases.length <= 1}
+                      onClick={() => handleDeleteEmail(email)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <form onSubmit={handleAddEmailSubmit} className="settings-email-form">
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="exemplo@desenvolvedor.com"
+                  required
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  disabled={isAddingEmail}
+                />
+                <button 
+                  type="submit" 
+                  className="btn-add-email" 
+                  disabled={isAddingEmail || !newEmail.trim()}
+                >
+                  <Plus size={16} />
+                  {isAddingEmail ? 'Adicionando...' : 'Adicionar E-mail'}
+                </button>
+              </form>
+            </section>
           </div>
         )}
 

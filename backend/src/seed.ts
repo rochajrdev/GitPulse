@@ -28,9 +28,9 @@ async function main() {
 
   console.log(`👤 Usuário criado: ${user.username} (${user.name})`);
 
-  // Gera commits para o ano de 2026 até hoje (18 de maio de 2026)
-  const startDate = new Date('2026-01-01T00:00:00.000Z');
-  const endDate = new Date('2026-05-18T23:59:59.000Z');
+  // Gera commits para os anos de 2024, 2025 e 2026 até hoje
+  const startDate = new Date('2024-01-01T00:00:00.000Z');
+  const endDate = new Date();
   
   const platforms = ['github', 'gitlab', 'bitbucket', 'local'];
   const repos = {
@@ -116,7 +116,7 @@ async function main() {
   }
 
   // Insere em lotes para performance
-  console.log(`📦 Gerando ${totalCommits} commits fictícios espalhados por 2026...`);
+  console.log(`📦 Gerando ${totalCommits} commits fictícios espalhados de 2024 a 2026...`);
   await prisma.commit.createMany({
     data: commitData,
   });

@@ -110,6 +110,54 @@ server.post('/api/v1/users/:username/emails', async (request, reply) => {
 });
 
 // ==========================================
+// ROTA: Remover E-mail (Auxiliar para Dev)
+// ==========================================
+const deleteEmailSchema = z.object({
+  email: z.string().email(),
+});
+
+server.delete('/api/v1/users/:username/emails', async (request, reply) => {
+  try {
+    const { username } = request.params as { username: string };
+    const { email } = deleteEmailSchema.parse(request.query);
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      include: { emailAliases: true },
+    });
+    
+    if (!user) {
+      reply.code(404);
+      return { error: 'Usuário não encontrado' };
+    }
+
+    // Não permite excluir se for o único e-mail
+    if (user.emailAliases.length <= 1) {
+      reply.code(400);
+      return { error: 'Não é possível remover o único e-mail cadastrado.' };
+    }
+
+    const aliasExists = user.emailAliases.some((alias: { email: string }) => alias.email.toLowerCase() === email.toLowerCase());
+    if (!aliasExists) {
+      reply.code(404);
+      return { error: 'E-mail não está associado a este usuário.' };
+    }
+
+    // Remove o alias do banco
+    await prisma.emailAlias.delete({
+      where: {
+        email,
+      },
+    });
+
+    return { success: true, message: 'E-mail removido com sucesso!' };
+  } catch (error) {
+    reply.code(400);
+    return { error: error instanceof Error ? error.message : 'Invalid request' };
+  }
+});
+
+// ==========================================
 // ROTA: Sincronizar Histórico GitHub
 // ==========================================
 server.post('/api/v1/users/:username/sync', async (request, reply) => {
@@ -316,8 +364,6 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
   const { username } = request.params as { username: string };
   const { year } = request.query as { year?: string };
 
-  const currentYear = year ? parseInt(year) : new Date().getFullYear();
-
   const user = await prisma.user.findUnique({
     where: { username },
     include: {
@@ -330,16 +376,36 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     return { error: 'Usuário não encontrado' };
   }
 
-  // Busca todos os commits do ano especificado
-  const startOfYear = new Date(`${currentYear}-01-01T00:00:00.000Z`);
-  const endOfYear = new Date(`${currentYear}-12-31T23:59:59.999Z`);
+  // Determina o intervalo de datas
+  let startOfRange: Date;
+  let endOfRange: Date;
+  let startDateStr: string;
+  let endDateStr: string;
 
+  const now = new Date();
+
+  if (year === 'last-year' || !year) {
+    // No último ano: últimos 365 dias
+    endOfRange = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    startOfRange = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+    endDateStr = endOfRange.toISOString().split('T')[0];
+    startDateStr = startOfRange.toISOString().split('T')[0];
+  } else {
+    const currentYear = parseInt(year);
+    startOfRange = new Date(`${currentYear}-01-01T00:00:00.000Z`);
+    endOfRange = new Date(`${currentYear}-12-31T23:59:59.999Z`);
+    startDateStr = `${currentYear}-01-01`;
+    endDateStr = `${currentYear}-12-31`;
+  }
+
+  // Busca todos os commits do período especificado
   const commits = await prisma.commit.findMany({
     where: {
       userId: user.id,
       timestamp: {
-        gte: startOfYear,
-        lte: endOfYear,
+        gte: startOfRange,
+        lte: endOfRange,
       },
     },
     orderBy: {
@@ -353,8 +419,8 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
       userId: user.id,
       source: 'github',
       date: {
-        gte: `${currentYear}-01-01`,
-        lte: `${currentYear}-12-31`,
+        gte: startDateStr,
+        lte: endDateStr,
       },
     },
     orderBy: { date: 'asc' },
@@ -502,6 +568,54 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     }
   }
 
+  // Busca todos os anos em que o usuário tem contribuições/commits
+  const firstCommit = await prisma.commit.findFirst({
+    where: { userId: user.id },
+    orderBy: { timestamp: 'asc' },
+    select: { timestamp: true }
+  });
+  
+  const lastCommit = await prisma.commit.findFirst({
+    where: { userId: user.id },
+    orderBy: { timestamp: 'desc' },
+    select: { timestamp: true }
+  });
+
+  const firstContribution = await prisma.contributionDay.findFirst({
+    where: { userId: user.id },
+    orderBy: { date: 'asc' },
+    select: { date: true }
+  });
+
+  const lastContribution = await prisma.contributionDay.findFirst({
+    where: { userId: user.id },
+    orderBy: { date: 'desc' },
+    select: { date: true }
+  });
+
+  let minYear = now.getFullYear();
+  let maxYear = now.getFullYear();
+
+  if (firstCommit) {
+    minYear = Math.min(minYear, new Date(firstCommit.timestamp).getFullYear());
+  }
+  if (lastCommit) {
+    maxYear = Math.max(maxYear, new Date(lastCommit.timestamp).getFullYear());
+  }
+  if (firstContribution) {
+    const yearVal = parseInt(firstContribution.date.split('-')[0]);
+    if (!isNaN(yearVal)) minYear = Math.min(minYear, yearVal);
+  }
+  if (lastContribution) {
+    const yearVal = parseInt(lastContribution.date.split('-')[0]);
+    if (!isNaN(yearVal)) maxYear = Math.max(maxYear, yearVal);
+  }
+
+  const years: number[] = [];
+  for (let y = maxYear; y >= minYear; y--) {
+    years.push(y);
+  }
+
   const totalCommits = commits.length;
   const activeDaysCount = activeDays.length;
 
@@ -521,6 +635,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
       platformBreakdown: platformCount,
     },
     dailyCommits,
+    years,
   };
 });
 

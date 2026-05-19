@@ -195,6 +195,7 @@ h1, h2, h3, h4, h5, h6 {
   top: 0;
   z-index: 100;
   box-shadow: 18px 0 40px rgba(0, 0, 0, 0.28);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar::before {
@@ -355,6 +356,7 @@ h1, h2, h3, h4, h5, h6 {
   margin-left: 284px;
   padding: 40px 48px;
   max-width: 1300px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Header */
@@ -1082,6 +1084,239 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 0.85;
     transform: scale(0.985);
   }
+}
+
+/* ==========================================
+   SIDEBAR COLLAPSED & HAMBURGER STYLES
+   ========================================== */
+.sidebar-header-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.sidebar-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.sidebar-toggle-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar.collapsed {
+  width: 78px;
+  padding: 20px 10px;
+}
+
+.sidebar.collapsed .sidebar-header-toggle {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  padding: 10px 5px;
+  align-items: center;
+}
+
+.sidebar.collapsed .brand-name,
+.sidebar.collapsed .self-hosted-badge,
+.sidebar.collapsed .user-info-text {
+  display: none;
+}
+
+.sidebar.collapsed .nav-menu {
+  gap: 14px;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 14px 0;
+  gap: 0;
+  border-radius: 12px;
+}
+
+.sidebar.collapsed .nav-item span {
+  display: none;
+}
+
+.sidebar.collapsed .nav-item svg {
+  margin: 0;
+}
+
+.sidebar.collapsed .nav-item.active::after {
+  display: none;
+}
+
+.sidebar.collapsed .user-avatar {
+  margin: 0 auto;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  justify-content: center;
+  padding: 14px 0;
+}
+
+.sidebar.collapsed .sidebar-footer .user-info-text {
+  display: none;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 78px;
+}
+
+/* ==========================================
+   SETTINGS TAB STYLES
+   ========================================== */
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.settings-section {
+  padding: 32px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.settings-profile-card {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-color);
+  padding: 20px;
+  border-radius: var(--border-radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-profile-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-profile-value {
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px 14px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.email-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.email-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  padding: 12px 18px;
+  border-radius: var(--border-radius-md);
+  transition: var(--transition-fast);
+}
+
+.email-item-row:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.email-text-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.email-dot-active {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-github);
+  box-shadow: 0 0 8px var(--color-github);
+}
+
+.btn-delete-email {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.btn-delete-email:hover {
+  color: var(--error);
+  background: rgba(255, 0, 0, 0.08);
+}
+
+.settings-email-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.settings-email-form input {
+  flex: 1;
+}
+
+.btn-add-email {
+  background: var(--color-github);
+  border: none;
+  color: var(--bg-primary);
+  padding: 0 20px;
+  border-radius: var(--border-radius-md);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition-smooth);
+}
+
+.btn-add-email:hover {
+  background: hsl(142, 100%, 65%);
+  box-shadow: 0 0 14px rgba(var(--color-github-rgb), 0.35);
+}
+
+.btn-add-email:disabled {
+  background: var(--border-color);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 
