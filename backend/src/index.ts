@@ -208,7 +208,7 @@ server.post('/api/v1/users/:username/sync', async (request, reply) => {
       return { error: 'Usuário não encontrado' };
     }
 
-    const email = user.emailAliases[0]?.email || 'juniorbing0317@gmail.com';
+    const email = user.emailAliases[0]?.email || 'dev@example.com';
 
     // 1. Sincroniza dados do contribution calendar via GraphQL
     let contributionStats = { grandTotal: 0, totalInserted: 0 };
@@ -288,6 +288,19 @@ server.post('/api/v1/webhooks/:token', async (request, reply) => {
     // Parser GitLab Push Hook
     if (body && Array.isArray(body.commits)) {
       const repoName = body.project?.path_with_namespace || 'unknown/repo';
+      commitsToProcess = body.commits.map((c: any) => ({
+        hash: c.id || '',
+        message: c.message || '',
+        authorEmail: c.author?.email || '',
+        timestamp: new Date(c.timestamp),
+        repository: repoName,
+      }));
+    }
+  } else if (headers['x-gitea-event']) {
+    platform = 'codeberg';
+    // Parser Codeberg/Gitea Push Hook
+    if (body && Array.isArray(body.commits)) {
+      const repoName = body.repository?.full_name || 'unknown/repo';
       commitsToProcess = body.commits.map((c: any) => ({
         hash: c.id || '',
         message: c.message || '',
@@ -460,12 +473,12 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     orderBy: { date: 'asc' },
   });
 
-  // Agrupa os commits por dia (mantido para breakdown por plataforma)
   const dailyCommits: Record<string, {
     total: number;
     github: number;
     gitlab: number;
     bitbucket: number;
+    codeberg: number;
     local: number;
   }> = {};
 
@@ -473,6 +486,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     github: 0,
     gitlab: 0,
     bitbucket: 0,
+    codeberg: 0,
     local: 0,
   };
 
@@ -484,6 +498,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
         github:    cd.count, // todos os dados vêm do GitHub
         gitlab:    0,
         bitbucket: 0,
+        codeberg:  0,
         local:     0,
       };
       platformCount.github += cd.count;
@@ -498,7 +513,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
       const dateStr = `${year}-${month}-${day}`;
 
       if (!dailyCommits[dateStr]) {
-        dailyCommits[dateStr] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, local: 0 };
+        dailyCommits[dateStr] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0 };
       }
 
       dailyCommits[dateStr].total++;

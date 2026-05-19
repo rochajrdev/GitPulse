@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import { prisma } from './db.js';
 
-const GITHUB_USERNAME = process.env.GITHUB_USERNAME || 'rochajrdev';
-const USER_NAME       = process.env.USER_NAME       || 'Adailson';
-const USER_EMAIL      = process.env.USER_EMAIL      || 'juniorbing0317@gmail.com';
+const GITHUB_USERNAME = process.env.GITHUB_USERNAME || 'dev-user';
+const USER_NAME       = process.env.USER_NAME       || 'Developer';
+const USER_EMAIL      = process.env.USER_EMAIL      || 'dev@example.com';
 const GITHUB_TOKEN    = process.env.GITHUB_TOKEN    || '';
 
 // Query GraphQL do GitHub — retorna o contributionCalendar exato do perfil

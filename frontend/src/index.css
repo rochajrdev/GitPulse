@@ -23,6 +23,9 @@
   --color-bitbucket: hsl(207, 95%, 55%);
   --color-bitbucket-rgb: 20, 150, 255;
   
+  --color-codeberg: hsl(198, 90%, 50%);
+  --color-codeberg-rgb: 15, 155, 230;
+  
   --color-local: hsl(282, 90%, 60%);
   --color-local-rgb: 190, 50, 255;
   
@@ -40,6 +43,7 @@
   --neon-shadow-github: 0 0 15px rgba(var(--color-github-rgb), 0.15);
   --neon-shadow-gitlab: 0 0 15px rgba(var(--color-gitlab-rgb), 0.15);
   --neon-shadow-bitbucket: 0 0 15px rgba(var(--color-bitbucket-rgb), 0.15);
+  --neon-shadow-codeberg: 0 0 15px rgba(var(--color-codeberg-rgb), 0.15);
   
   --border-radius-lg: 16px;
   --border-radius-md: 10px;
@@ -540,6 +544,7 @@ h1, h2, h3, h4, h5, h6 {
 .filter-btn.active.github { background: rgba(var(--color-github-rgb), 0.08); border-color: var(--color-github); color: var(--color-github); }
 .filter-btn.active.gitlab { background: rgba(var(--color-gitlab-rgb), 0.08); border-color: var(--color-gitlab); color: var(--color-gitlab); }
 .filter-btn.active.bitbucket { background: rgba(var(--color-bitbucket-rgb), 0.08); border-color: var(--color-bitbucket); color: var(--color-bitbucket); }
+.filter-btn.active.codeberg { background: rgba(var(--color-codeberg-rgb), 0.08); border-color: var(--color-codeberg); color: var(--color-codeberg); }
 .filter-btn.active.local { background: rgba(var(--color-local-rgb), 0.08); border-color: var(--color-local); color: var(--color-local); }
 
 .filter-indicator {
@@ -552,6 +557,7 @@ h1, h2, h3, h4, h5, h6 {
 .filter-btn.active.github .filter-indicator { background-color: var(--color-github); box-shadow: 0 0 6px var(--color-github); }
 .filter-btn.active.gitlab .filter-indicator { background-color: var(--color-gitlab); box-shadow: 0 0 6px var(--color-gitlab); }
 .filter-btn.active.bitbucket .filter-indicator { background-color: var(--color-bitbucket); box-shadow: 0 0 6px var(--color-bitbucket); }
+.filter-btn.active.codeberg .filter-indicator { background-color: var(--color-codeberg); box-shadow: 0 0 6px var(--color-codeberg); }
 .filter-btn.active.local .filter-indicator { background-color: var(--color-local); box-shadow: 0 0 6px var(--color-local); }
 
 /* Heatmap Grid Rendering */
@@ -643,6 +649,7 @@ h1, h2, h3, h4, h5, h6 {
 .platform-row.github .platform-icon-circle { background: rgba(var(--color-github-rgb), 0.1); color: var(--color-github); }
 .platform-row.gitlab .platform-icon-circle { background: rgba(var(--color-gitlab-rgb), 0.1); color: var(--color-gitlab); }
 .platform-row.bitbucket .platform-icon-circle { background: rgba(var(--color-bitbucket-rgb), 0.1); color: var(--color-bitbucket); }
+.platform-row.codeberg .platform-icon-circle { background: rgba(var(--color-codeberg-rgb), 0.1); color: var(--color-codeberg); }
 .platform-row.local .platform-icon-circle { background: rgba(var(--color-local-rgb), 0.1); color: var(--color-local); }
 
 .platform-progress-container {
@@ -681,6 +688,7 @@ h1, h2, h3, h4, h5, h6 {
 .platform-row.github .platform-progress-bar { background: var(--color-github); box-shadow: 0 0 6px rgba(var(--color-github-rgb), 0.3); }
 .platform-row.gitlab .platform-progress-bar { background: var(--color-gitlab); box-shadow: 0 0 6px rgba(var(--color-gitlab-rgb), 0.3); }
 .platform-row.bitbucket .platform-progress-bar { background: var(--color-bitbucket); box-shadow: 0 0 6px rgba(var(--color-bitbucket-rgb), 0.3); }
+.platform-row.codeberg .platform-progress-bar { background: var(--color-codeberg); box-shadow: 0 0 6px rgba(var(--color-codeberg-rgb), 0.3); }
 .platform-row.local .platform-progress-bar { background: var(--color-local); box-shadow: 0 0 6px rgba(var(--color-local-rgb), 0.3); }
 
 /* Email Aliases List in Sidebar or Settings */
@@ -771,6 +779,7 @@ h1, h2, h3, h4, h5, h6 {
 .tooltip-dot.github { background: var(--color-github); }
 .tooltip-dot.gitlab { background: var(--color-gitlab); }
 .tooltip-dot.bitbucket { background: var(--color-bitbucket); }
+.tooltip-dot.codeberg { background: var(--color-codeberg); }
 .tooltip-dot.local { background: var(--color-local); }
 
 /* Integrations View */

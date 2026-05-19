@@ -41,6 +41,7 @@ interface DailyCommit {
   github: number;
   gitlab: number;
   bitbucket: number;
+  codeberg: number;
   local: number;
 }
 
@@ -76,11 +77,12 @@ export default function App() {
     github: true,
     gitlab: true,
     bitbucket: true,
+    codeberg: true,
     local: true,
   });
 
   // Estado para Guia de Integração
-  const [activeIntTab, setActiveIntTab] = useState<'github' | 'gitlab' | 'bitbucket' | 'local'>('github');
+  const [activeIntTab, setActiveIntTab] = useState<'github' | 'gitlab' | 'bitbucket' | 'codeberg' | 'local'>('github');
 
   // Referência do Tooltip Portal
   const [tooltip, setTooltip] = useState<{
@@ -98,7 +100,15 @@ export default function App() {
   });
 
   const backendUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
-  const username = 'rochajrdev';
+  const [username, setUsername] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const queryUser = params.get('username');
+    if (queryUser) {
+      localStorage.setItem('gitpulse_username', queryUser);
+      return queryUser;
+    }
+    return localStorage.getItem('gitpulse_username') || '';
+  });
 
   // ==========================================
   // CARREGAR DADOS DO BACKEND
@@ -107,7 +117,27 @@ export default function App() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${backendUrl}/api/v1/users/${username}/summary?year=${selectedYear}&t=${Date.now()}`);
+
+      let activeUser = username;
+      if (!activeUser) {
+        // Busca a lista de usuários cadastrados no banco
+        const usersRes = await fetch(`${backendUrl}/api/v1/users`);
+        if (usersRes.ok) {
+          const users = await usersRes.json();
+          if (Array.isArray(users) && users.length > 0) {
+            activeUser = users[0].username;
+            localStorage.setItem('gitpulse_username', activeUser);
+            setUsername(activeUser);
+          }
+        }
+      }
+
+      if (!activeUser) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${backendUrl}/api/v1/users/${activeUser}/summary?year=${selectedYear}&t=${Date.now()}`);
       if (!response.ok) {
         throw new Error('Falha ao carregar o resumo de contribuições');
       }
@@ -246,7 +276,7 @@ export default function App() {
 
   useEffect(() => {
     fetchSummary();
-  }, [selectedYear]);
+  }, [selectedYear, username]);
 
   useEffect(() => {
     if (userData?.user.name) {
@@ -301,16 +331,17 @@ export default function App() {
     // 1. Filtra as estatísticas de commits diários
     const daily: Record<string, DailyCommit> = {};
     let total = 0;
-    const platformCount = { github: 0, gitlab: 0, bitbucket: 0, local: 0 };
+    const platformCount = { github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0 };
 
     Object.entries(userData.dailyCommits).forEach(([dateStr, commit]) => {
       let filteredDayCount = 0;
       let gh = platformFilters.github ? commit.github : 0;
       let gl = platformFilters.gitlab ? commit.gitlab : 0;
       let bb = platformFilters.bitbucket ? commit.bitbucket : 0;
+      let cb = platformFilters.codeberg ? commit.codeberg : 0;
       let lc = platformFilters.local ? commit.local : 0;
 
-      filteredDayCount = gh + gl + bb + lc;
+      filteredDayCount = gh + gl + bb + cb + lc;
 
       if (filteredDayCount > 0) {
         daily[dateStr] = {
@@ -318,6 +349,7 @@ export default function App() {
           github: gh,
           gitlab: gl,
           bitbucket: bb,
+          codeberg: cb,
           local: lc
         };
 
@@ -325,6 +357,7 @@ export default function App() {
         platformCount.github += gh;
         platformCount.gitlab += gl;
         platformCount.bitbucket += bb;
+        platformCount.codeberg += cb;
         platformCount.local += lc;
       }
     });
@@ -542,7 +575,7 @@ export default function App() {
   // ==========================================
   const handleMouseEnter = (e: React.MouseEvent<SVGRectElement>, dateStr: string) => {
     if (!userData) return;
-    const commits = userData.dailyCommits[dateStr] || { total: 0, github: 0, gitlab: 0, bitbucket: 0, local: 0 };
+    const commits = userData.dailyCommits[dateStr] || { total: 0, github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0 };
     
     // Formata a data (ex: "18 de maio de 2026")
     const date = new Date(dateStr + 'T12:00:00.000Z');
@@ -656,33 +689,37 @@ export default function App() {
           </div>
 
           <div className="header-actions">
-            {activeTab === 'dashboard' && (
-              <select 
-                className="year-selector" 
-                value={selectedYear}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedYear(val === 'last-year' ? 'last-year' : parseInt(val));
-                }}
+          {userData && (
+            <div className="header-actions">
+              {activeTab === 'dashboard' && (
+                <select 
+                  className="year-selector" 
+                  value={selectedYear}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedYear(val === 'last-year' ? 'last-year' : parseInt(val));
+                  }}
+                >
+                  <option value="last-year">No último ano</option>
+                  {userData?.years?.map((yr) => (
+                    <option key={yr} value={yr}>
+                      Ano de {yr}
+                    </option>
+                  ))}
+                </select>
+              )}
+              
+              <button 
+                className="btn-icon" 
+                onClick={handleSyncCards} 
+                disabled={isSyncingCards || loading}
+                title="Sincronizar com o GitHub"
               >
-                <option value="last-year">No último ano</option>
-                {userData?.years?.map((yr) => (
-                  <option key={yr} value={yr}>
-                    Ano de {yr}
-                  </option>
-                ))}
-              </select>
-            )}
-            
-            <button 
-              className="btn-icon" 
-              onClick={handleSyncCards} 
-              disabled={isSyncingCards || loading}
-              title="Sincronizar com o GitHub"
-            >
-              <RefreshCw size={14} className={isSyncingCards || loading ? 'spin' : ''} />
-              Sincronizar
-            </button>
+                <RefreshCw size={14} className={isSyncingCards || loading ? 'spin' : ''} />
+                Sincronizar
+              </button>
+            </div>
+          )}
           </div>
         </header>
 
@@ -700,6 +737,103 @@ export default function App() {
             <h3 style={{ color: 'var(--error)', marginBottom: '8px' }}>Erro ao conectar com a API</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>{error}</p>
             <button className="btn-primary" onClick={() => fetchSummary()}>Tentar Novamente</button>
+          </div>
+        )}
+
+        {/* WELCOME / EMPTY STATE */}
+        {!userData && !loading && !error && (
+          <div className="glass-panel animate-fade-in" style={{ padding: '48px 32px', textAlign: 'center', maxWidth: '600px', margin: '80px auto' }}>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '16px', background: 'linear-gradient(135deg, #fff 0%, var(--text-muted) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Bem-vindo ao GitPulse! 🌌
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.96rem', lineHeight: '1.6', marginBottom: '32px' }}>
+              Nenhum perfil de desenvolvedor ativo foi detectado. Para começar a centralizar e analisar suas contribuições do GitHub, GitLab, Bitbucket ou Codeberg, crie seu primeiro perfil abaixo.
+            </p>
+
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const newU = (form.elements.namedItem('welcome-username') as HTMLInputElement).value.trim();
+                const newN = (form.elements.namedItem('welcome-name') as HTMLInputElement).value.trim();
+                const newE = (form.elements.namedItem('welcome-email') as HTMLInputElement).value.trim();
+
+                if (!newU || !newN) return;
+
+                try {
+                  setLoading(true);
+                  const response = await fetch(`${backendUrl}/api/v1/users`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      username: newU,
+                      name: newN,
+                      emails: newE ? [newE] : [],
+                    }),
+                  });
+
+                  const data = await response.json();
+                  if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao cadastrar perfil');
+                  }
+
+                  showToast('Perfil cadastrado com sucesso!', 'success');
+                  localStorage.setItem('gitpulse_username', newU);
+                  setUsername(newU);
+                  form.reset();
+                } catch (err) {
+                  showToast(err instanceof Error ? err.message : 'Falha ao cadastrar perfil', 'error');
+                } finally {
+                  setLoading(false);
+                }
+              }} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}
+            >
+              <div className="settings-profile-field" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                <label htmlFor="welcome-username" className="settings-profile-label">Nome de Usuário (GitHub/Codeberg)</label>
+                <input
+                  id="welcome-username"
+                  name="welcome-username"
+                  type="text"
+                  className="form-input"
+                  style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '6px' }}
+                  placeholder="Ex: torvalds"
+                  required
+                />
+              </div>
+              <div className="settings-profile-field" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                <label htmlFor="welcome-name" className="settings-profile-label">Nome Completo</label>
+                <input
+                  id="welcome-name"
+                  name="welcome-name"
+                  type="text"
+                  className="form-input"
+                  style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '6px' }}
+                  placeholder="Ex: Linus Torvalds"
+                  required
+                />
+              </div>
+              <div className="settings-profile-field" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                <label htmlFor="welcome-email" className="settings-profile-label">E-mail de Autor (Opcional)</label>
+                <input
+                  id="welcome-email"
+                  name="welcome-email"
+                  type="email"
+                  className="form-input"
+                  style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '6px' }}
+                  placeholder="Ex: linus@git.org"
+                />
+              </div>
+              <button 
+                type="submit" 
+                className="btn-add-email" 
+                style={{ marginTop: '12px', padding: '12px', display: 'flex', justifyContent: 'center', width: '100%', background: 'var(--color-accent)' }}
+              >
+                Criar Perfil e Começar
+              </button>
+            </form>
           </div>
         )}
 
@@ -848,6 +982,13 @@ export default function App() {
                   >
                     <div className="filter-indicator"></div>
                     Bitbucket
+                  </button>
+                  <button 
+                    className={`filter-btn ${platformFilters.codeberg ? 'active codeberg' : ''}`}
+                    onClick={() => setPlatformFilters(prev => ({ ...prev, codeberg: !prev.codeberg }))}
+                  >
+                    <div className="filter-indicator"></div>
+                    Codeberg
                   </button>
                   <button 
                     className={`filter-btn ${platformFilters.local ? 'active local' : ''}`}
@@ -1022,6 +1163,12 @@ export default function App() {
                 Bitbucket
               </button>
               <button 
+                className={`int-tab ${activeIntTab === 'codeberg' ? 'active' : ''}`}
+                onClick={() => setActiveIntTab('codeberg')}
+              >
+                Codeberg
+              </button>
+              <button 
                 className={`int-tab ${activeIntTab === 'local' ? 'active' : ''}`}
                 onClick={() => setActiveIntTab('local')}
               >
@@ -1148,6 +1295,38 @@ export default function App() {
               </div>
             )}
 
+            {activeIntTab === 'codeberg' && (
+              <div className="animate-fade-in">
+                <div className="guide-step">
+                  <div className="step-num">1</div>
+                  <div className="step-content">
+                    <span className="step-title">Acesse Configurações do Codeberg</span>
+                    <p className="step-desc">
+                      No seu repositório do Codeberg, navegue até a aba <strong>Settings</strong> (Configurações) no menu superior e clique em <strong>Webhooks</strong> na barra lateral esquerda.
+                    </p>
+                  </div>
+                </div>
+                <div className="guide-step">
+                  <div className="step-num">2</div>
+                  <div className="step-content">
+                    <span className="step-title">Adicionar Webhook</span>
+                    <p className="step-desc">
+                      Clique em <strong>Add Webhook</strong> (Adicionar Webhook) e selecione o tipo <strong>Gitea</strong>.
+                    </p>
+                  </div>
+                </div>
+                <div className="guide-step">
+                  <div className="step-num">3</div>
+                  <div className="step-content">
+                    <span className="step-title">Configurar URL e Eventos</span>
+                    <p className="step-desc">
+                      Cole a URL exclusiva gerada no campo <strong>Payload URL</strong>, defina o Content Type como <strong>application/json</strong>, selecione apenas o evento de <strong>Push</strong> e clique em <strong>Add Webhook</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeIntTab === 'local' && (
               <div className="animate-fade-in">
                 <p className="step-desc" style={{ fontSize: '0.92rem', marginBottom: '20px' }}>
@@ -1227,6 +1406,135 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section className="glass-panel settings-section">
+              <h3 className="section-title">Alternar / Cadastrar Perfil</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px', marginBottom: '20px' }}>
+                Troque para outra conta ativa ou cadastre um novo perfil de desenvolvedor local neste GitPulse.
+              </p>
+
+              <div className="settings-grid" style={{ gap: '24px' }}>
+                {/* ALTERNAR PERFIL */}
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const targetInput = (e.target as HTMLFormElement).elements.namedItem('switch-username') as HTMLInputElement;
+                    const val = targetInput.value.trim();
+                    if (val) {
+                      localStorage.setItem('gitpulse_username', val);
+                      setUsername(val);
+                      showToast(`Alternado para o perfil @${val}`, 'success');
+                    }
+                  }} 
+                  className="settings-profile-card"
+                >
+                  <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px' }}>Alternar Perfil Ativo</h4>
+                  <div className="settings-profile-field">
+                    <label htmlFor="switch-username" className="settings-profile-label">Username do Perfil</label>
+                    <input
+                      id="switch-username"
+                      name="switch-username"
+                      type="text"
+                      className="form-input"
+                      style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '4px' }}
+                      placeholder="Ex: seu-usuario"
+                      required
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="btn-add-email" 
+                    style={{ marginTop: '8px', alignSelf: 'flex-start', padding: '10px 18px', background: 'var(--color-accent)' }}
+                  >
+                    Trocar Perfil
+                  </button>
+                </form>
+
+                {/* CADASTRAR NOVO PERFIL */}
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const newU = (form.elements.namedItem('new-username') as HTMLInputElement).value.trim();
+                    const newN = (form.elements.namedItem('new-name') as HTMLInputElement).value.trim();
+                    const newE = (form.elements.namedItem('new-email') as HTMLInputElement).value.trim();
+
+                    if (!newU || !newN) return;
+
+                    try {
+                      const response = await fetch(`${backendUrl}/api/v1/users`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          username: newU,
+                          name: newN,
+                          emails: newE ? [newE] : [],
+                        }),
+                      });
+
+                      const data = await response.json();
+                      if (!response.ok) {
+                        throw new Error(data.error || 'Erro ao cadastrar novo perfil');
+                      }
+
+                      showToast('Novo perfil cadastrado com sucesso!', 'success');
+                      localStorage.setItem('gitpulse_username', newU);
+                      setUsername(newU);
+                      form.reset();
+                    } catch (err) {
+                      showToast(err instanceof Error ? err.message : 'Falha ao cadastrar perfil', 'error');
+                    }
+                  }} 
+                  className="settings-profile-card"
+                >
+                  <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px' }}>Criar Novo Perfil</h4>
+                  <div className="settings-profile-field">
+                    <label htmlFor="new-username" className="settings-profile-label">Username (GitHub/Codeberg)</label>
+                    <input
+                      id="new-username"
+                      name="new-username"
+                      type="text"
+                      className="form-input"
+                      style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '4px' }}
+                      placeholder="Ex: torvalds"
+                      required
+                    />
+                  </div>
+                  <div className="settings-profile-field">
+                    <label htmlFor="new-name" className="settings-profile-label">Nome Completo</label>
+                    <input
+                      id="new-name"
+                      name="new-name"
+                      type="text"
+                      className="form-input"
+                      style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '4px' }}
+                      placeholder="Ex: Linus Torvalds"
+                      required
+                    />
+                  </div>
+                  <div className="settings-profile-field">
+                    <label htmlFor="new-email" className="settings-profile-label">E-mail Inicial (Opcional)</label>
+                    <input
+                      id="new-email"
+                      name="new-email"
+                      type="email"
+                      className="form-input"
+                      style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '4px' }}
+                      placeholder="Ex: linus@git.org"
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="btn-add-email" 
+                    style={{ marginTop: '8px', alignSelf: 'flex-start', padding: '10px 18px', background: 'var(--success)' }}
+                  >
+                    Cadastrar e Entrar
+                  </button>
+                </form>
               </div>
             </section>
 
