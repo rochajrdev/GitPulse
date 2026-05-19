@@ -1032,3 +1032,56 @@ h1, h2, h3, h4, h5, h6 {
   animation: pulse 1.5s infinite;
 }
 
+/* Metric Card Syncing & Skeleton Shimmer */
+.metric-card.syncing {
+  border-color: rgba(var(--color-github-rgb), 0.35);
+  box-shadow: 0 0 20px rgba(var(--color-github-rgb), 0.15);
+  animation: card-pulse 1.5s infinite ease-in-out;
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: var(--border-radius-sm);
+  display: inline-block;
+}
+
+.val-shimmer {
+  width: 90px;
+  height: 2.2rem;
+  margin-top: 4px;
+}
+
+.footer-shimmer {
+  width: 140px;
+  height: 0.75rem;
+  margin-top: 2px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes card-pulse {
+  0%, 100% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(0.985);
+  }
+}
+
+

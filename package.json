@@ -1,0 +1,16 @@
+{
+  "name": "gitpulse",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev": "npx --yes concurrently --kill-others \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "db:setup": "npm run db:setup --prefix backend",
+    "db:seed": "npm run db:seed --prefix backend",
+    "db:clean": "npm run db:clean --prefix backend",
+    "db:sync": "npm run db:sync --prefix backend",
+    "db:sync-contributions": "npm run db:sync-contributions --prefix backend",
+    "db:sync-all": "npm run db:sync-all --prefix backend"
+  }
+}

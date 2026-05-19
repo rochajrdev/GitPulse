@@ -58,6 +58,7 @@ export default function App() {
   const [selectedYear, setSelectedYear] = useState(2026);
   const [toast, setToast] = useState<Toast | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isSyncingCards, setIsSyncingCards] = useState(false);
 
   // Filtros de Plataforma
   const [platformFilters, setPlatformFilters] = useState({
@@ -138,9 +139,57 @@ export default function App() {
     }
   };
 
+  const handleSyncCards = async () => {
+    if (isSyncingCards) return;
+    try {
+      setIsSyncingCards(true);
+      setError(null);
+      showToast('Sincronizando métricas dos cards com o GitHub...', 'info');
+      
+      const response = await fetch(`${backendUrl}/api/v1/users/${username}/sync`, {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Falha ao sincronizar dados dos cards');
+      }
+      
+      await fetchSummary(false);
+      showToast('Métricas dos cards sincronizadas com sucesso!', 'success');
+    } catch (err) {
+      try {
+        await fetchSummary(false);
+      } catch (_) {}
+      showToast('Erro ao sincronizar cards. Usando dados locais.', 'error');
+    } finally {
+      setIsSyncingCards(false);
+    }
+  };
+
   useEffect(() => {
     fetchSummary();
   }, [selectedYear]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        (activeEl as HTMLElement).isContentEditable
+      );
+      
+      if (isInput) return;
+      
+      if (event.key.toLowerCase() === 'm') {
+        event.preventDefault();
+        handleSyncCards();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSyncingCards, selectedYear]);
 
   // ==========================================
   // FEEDBACK DE NOTIFICAÇÃO (TOAST)
@@ -465,11 +514,11 @@ export default function App() {
             
             <button 
               className="btn-icon" 
-              onClick={handleSyncGitHub} 
-              disabled={loading}
+              onClick={handleSyncCards} 
+              disabled={isSyncingCards || loading}
               title="Sincronizar com o GitHub"
             >
-              <RefreshCw size={14} className={loading ? 'spin' : ''} />
+              <RefreshCw size={14} className={isSyncingCards || loading ? 'spin' : ''} />
               Sincronizar
             </button>
           </div>
@@ -499,7 +548,7 @@ export default function App() {
           <div className="animate-fade-in">
             {/* CARDS DE MÉTRICAS */}
             <section className="metrics-grid">
-              <div className="glass-panel metric-card total">
+              <div className={`glass-panel metric-card total ${isSyncingCards ? 'syncing' : ''}`}>
                 <div className="metric-header">
                   <span>Commits Totais</span>
                   <div className="metric-icon-box">
@@ -507,16 +556,28 @@ export default function App() {
                   </div>
                 </div>
                 <div className="metric-card-val">
-                  {filteredData.stats.totalCommits}
-                  <span className="metric-unit">commits</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer val-shimmer"></span>
+                  ) : (
+                    <>
+                      {filteredData.stats.totalCommits}
+                      <span className="metric-unit">commits</span>
+                    </>
+                  )}
                 </div>
                 <div className="metric-footer">
-                  <TrendingUp size={12} style={{ color: 'var(--color-github)' }} />
-                  <span>no ano de {selectedYear}</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer footer-shimmer"></span>
+                  ) : (
+                    <>
+                      <TrendingUp size={12} style={{ color: 'var(--color-github)' }} />
+                      <span>no ano de {selectedYear}</span>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div className="glass-panel metric-card streak">
+              <div className={`glass-panel metric-card streak ${isSyncingCards ? 'syncing' : ''}`}>
                 <div className="metric-header">
                   <span>Sequência Atual</span>
                   <div className="metric-icon-box">
@@ -524,15 +585,25 @@ export default function App() {
                   </div>
                 </div>
                 <div className="metric-card-val">
-                  {filteredData.stats.currentStreak}
-                  <span className="metric-unit">dias</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer val-shimmer"></span>
+                  ) : (
+                    <>
+                      {filteredData.stats.currentStreak}
+                      <span className="metric-unit">dias</span>
+                    </>
+                  )}
                 </div>
                 <div className="metric-footer">
-                  <span>🔥 streak ativo no momento</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer footer-shimmer"></span>
+                  ) : (
+                    <span>🔥 streak ativo no momento</span>
+                  )}
                 </div>
               </div>
 
-              <div className="glass-panel metric-card record">
+              <div className={`glass-panel metric-card record ${isSyncingCards ? 'syncing' : ''}`}>
                 <div className="metric-header">
                   <span>Sequência Recorde</span>
                   <div className="metric-icon-box">
@@ -540,15 +611,25 @@ export default function App() {
                   </div>
                 </div>
                 <div className="metric-card-val">
-                  {filteredData.stats.longestStreak}
-                  <span className="metric-unit">dias</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer val-shimmer"></span>
+                  ) : (
+                    <>
+                      {filteredData.stats.longestStreak}
+                      <span className="metric-unit">dias</span>
+                    </>
+                  )}
                 </div>
                 <div className="metric-footer">
-                  <span>🏆 seu recorde histórico em {selectedYear}</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer footer-shimmer"></span>
+                  ) : (
+                    <span>🏆 seu recorde histórico em {selectedYear}</span>
+                  )}
                 </div>
               </div>
 
-              <div className="glass-panel metric-card active">
+              <div className={`glass-panel metric-card active ${isSyncingCards ? 'syncing' : ''}`}>
                 <div className="metric-header">
                   <span>Dias Ativos</span>
                   <div className="metric-icon-box">
@@ -556,11 +637,21 @@ export default function App() {
                   </div>
                 </div>
                 <div className="metric-card-val">
-                  {filteredData.stats.activeDaysCount}
-                  <span className="metric-unit">dias</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer val-shimmer"></span>
+                  ) : (
+                    <>
+                      {filteredData.stats.activeDaysCount}
+                      <span className="metric-unit">dias</span>
+                    </>
+                  )}
                 </div>
                 <div className="metric-footer">
-                  <span>📅 dias com commit cadastrado</span>
+                  {isSyncingCards ? (
+                    <span className="skeleton-shimmer footer-shimmer"></span>
+                  ) : (
+                    <span>📅 dias com commit cadastrado</span>
+                  )}
                 </div>
               </div>
             </section>
