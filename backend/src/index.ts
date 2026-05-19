@@ -158,6 +158,40 @@ server.delete('/api/v1/users/:username/emails', async (request, reply) => {
 });
 
 // ==========================================
+// ROTA: Atualizar Nome do Perfil
+// ==========================================
+const updateProfileSchema = z.object({
+  name: z.string().min(2).max(100),
+});
+
+server.put('/api/v1/users/:username', async (request, reply) => {
+  try {
+    const { username } = request.params as { username: string };
+    const { name } = updateProfileSchema.parse(request.body);
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (!user) {
+      reply.code(404);
+      return { error: 'Usuário não encontrado' };
+    }
+
+    // Atualiza o nome do usuário no banco
+    const updatedUser = await prisma.user.update({
+      where: { username },
+      data: { name },
+    });
+
+    return { success: true, user: updatedUser };
+  } catch (error) {
+    reply.code(400);
+    return { error: error instanceof Error ? error.message : 'Invalid request' };
+  }
+});
+
+// ==========================================
 // ROTA: Sincronizar Histórico GitHub
 // ==========================================
 server.post('/api/v1/users/:username/sync', async (request, reply) => {

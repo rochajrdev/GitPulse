@@ -61,6 +61,8 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [isAddingEmail, setIsAddingEmail] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [userData, setUserData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +188,34 @@ export default function App() {
     }
   };
 
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileName.trim() || !userData) return;
+
+    try {
+      setIsSavingProfile(true);
+      const response = await fetch(`${backendUrl}/api/v1/users/${username}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: profileName.trim() }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao salvar perfil');
+      }
+
+      showToast('Nome do perfil atualizado com sucesso!', 'success');
+      await fetchSummary(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Falha ao salvar perfil', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
 
   const handleSyncCards = async () => {
     if (isSyncingCards) return;
@@ -217,6 +247,12 @@ export default function App() {
   useEffect(() => {
     fetchSummary();
   }, [selectedYear]);
+
+  useEffect(() => {
+    if (userData?.user.name) {
+      setProfileName(userData.user.name);
+    }
+  }, [userData?.user.name]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1152,16 +1188,33 @@ export default function App() {
               </p>
 
               <div className="settings-grid">
-                <div className="settings-profile-card">
+                <form onSubmit={handleSaveProfile} className="settings-profile-card">
                   <div className="settings-profile-field">
-                    <span className="settings-profile-label">Nome Completo</span>
-                    <span className="settings-profile-value">{userData.user.name}</span>
+                    <label htmlFor="input-profile-name" className="settings-profile-label">Nome Completo</label>
+                    <input
+                      id="input-profile-name"
+                      type="text"
+                      className="form-input"
+                      style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)', marginTop: '4px' }}
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      disabled={isSavingProfile}
+                      required
+                    />
                   </div>
                   <div className="settings-profile-field">
                     <span className="settings-profile-label">Nome de Usuário</span>
                     <span className="settings-profile-value">@{userData.user.username}</span>
                   </div>
-                </div>
+                  <button 
+                    type="submit" 
+                    className="btn-add-email" 
+                    style={{ marginTop: '8px', alignSelf: 'flex-start', padding: '10px 18px' }}
+                    disabled={isSavingProfile || profileName.trim() === userData.user.name}
+                  >
+                    {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
+                  </button>
+                </form>
 
                 <div className="settings-profile-card" style={{ justifyContent: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
