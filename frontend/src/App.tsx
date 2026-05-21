@@ -16,6 +16,7 @@ import {
   Trash2,
   User
 } from 'lucide-react';
+import CommitLineChart from './components/CommitLineChart';
 
 // ==========================================
 // INTERFACES
@@ -1056,6 +1057,13 @@ export default function App() {
                 <span>Mais</span>
               </div>
             </section>
+
+            {/* GRÁFICO DE ATIVIDADE */}
+            <CommitLineChart
+              dailyCommits={userData.dailyCommits}
+              selectedYear={selectedYear}
+              platformFilters={platformFilters}
+            />
 
             {/* PLATFORM BREAKDOWN E ALIASES DE E-MAIL */}
             <div className="breakdown-row">
