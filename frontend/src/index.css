@@ -29,6 +29,9 @@
   --color-local: hsl(282, 90%, 60%);
   --color-local-rgb: 190, 50, 255;
   
+  --color-azure: hsl(207, 100%, 46%);
+  --color-azure-rgb: 0, 120, 212;
+  
   --color-accent: hsl(262, 85%, 60%);
   --color-accent-rgb: 140, 50, 255;
   
@@ -44,6 +47,7 @@
   --neon-shadow-gitlab: 0 0 15px rgba(var(--color-gitlab-rgb), 0.15);
   --neon-shadow-bitbucket: 0 0 15px rgba(var(--color-bitbucket-rgb), 0.15);
   --neon-shadow-codeberg: 0 0 15px rgba(var(--color-codeberg-rgb), 0.15);
+  --neon-shadow-azure: 0 0 15px rgba(var(--color-azure-rgb), 0.15);
   
   --border-radius-lg: 16px;
   --border-radius-md: 10px;
@@ -546,6 +550,7 @@ h1, h2, h3, h4, h5, h6 {
 .filter-btn.active.bitbucket { background: rgba(var(--color-bitbucket-rgb), 0.08); border-color: var(--color-bitbucket); color: var(--color-bitbucket); }
 .filter-btn.active.codeberg { background: rgba(var(--color-codeberg-rgb), 0.08); border-color: var(--color-codeberg); color: var(--color-codeberg); }
 .filter-btn.active.local { background: rgba(var(--color-local-rgb), 0.08); border-color: var(--color-local); color: var(--color-local); }
+.filter-btn.active.azure { background: rgba(var(--color-azure-rgb), 0.08); border-color: var(--color-azure); color: var(--color-azure); }
 
 .filter-indicator {
   width: 8px;
@@ -559,6 +564,7 @@ h1, h2, h3, h4, h5, h6 {
 .filter-btn.active.bitbucket .filter-indicator { background-color: var(--color-bitbucket); box-shadow: 0 0 6px var(--color-bitbucket); }
 .filter-btn.active.codeberg .filter-indicator { background-color: var(--color-codeberg); box-shadow: 0 0 6px var(--color-codeberg); }
 .filter-btn.active.local .filter-indicator { background-color: var(--color-local); box-shadow: 0 0 6px var(--color-local); }
+.filter-btn.active.azure .filter-indicator { background-color: var(--color-azure); box-shadow: 0 0 6px var(--color-azure); }
 
 /* Heatmap Grid Rendering */
 .heatmap-wrapper {
@@ -651,6 +657,7 @@ h1, h2, h3, h4, h5, h6 {
 .platform-row.bitbucket .platform-icon-circle { background: rgba(var(--color-bitbucket-rgb), 0.1); color: var(--color-bitbucket); }
 .platform-row.codeberg .platform-icon-circle { background: rgba(var(--color-codeberg-rgb), 0.1); color: var(--color-codeberg); }
 .platform-row.local .platform-icon-circle { background: rgba(var(--color-local-rgb), 0.1); color: var(--color-local); }
+.platform-row.azure .platform-icon-circle { background: rgba(var(--color-azure-rgb), 0.1); color: var(--color-azure); }
 
 .platform-progress-container {
   flex: 1;
@@ -690,6 +697,7 @@ h1, h2, h3, h4, h5, h6 {
 .platform-row.bitbucket .platform-progress-bar { background: var(--color-bitbucket); box-shadow: 0 0 6px rgba(var(--color-bitbucket-rgb), 0.3); }
 .platform-row.codeberg .platform-progress-bar { background: var(--color-codeberg); box-shadow: 0 0 6px rgba(var(--color-codeberg-rgb), 0.3); }
 .platform-row.local .platform-progress-bar { background: var(--color-local); box-shadow: 0 0 6px rgba(var(--color-local-rgb), 0.3); }
+.platform-row.azure .platform-progress-bar { background: var(--color-azure); box-shadow: 0 0 6px rgba(var(--color-azure-rgb), 0.3); }
 
 /* Email Aliases List in Sidebar or Settings */
 .aliases-box {
@@ -1574,6 +1582,11 @@ h1, h2, h3, h4, h5, h6 {
 .badge-dot.local {
   background-color: var(--color-local);
   color: var(--color-local);
+}
+
+.badge-dot.azure {
+  background-color: var(--color-azure);
+  color: var(--color-azure);
 }
 
 .info-box-placeholder {

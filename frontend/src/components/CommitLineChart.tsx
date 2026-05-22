@@ -8,6 +8,7 @@ interface DailyCommit {
   bitbucket: number;
   codeberg: number;
   local: number;
+  azure?: number;
 }
 
 interface CommitLineChartProps {
@@ -18,44 +19,40 @@ interface CommitLineChartProps {
 
 export default function CommitLineChart({ dailyCommits, selectedYear, platformFilters }: CommitLineChartProps) {
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   // 1. Determina a cor do gráfico baseada nos filtros ativos
-  const { chartColor, glowColor, gradientId } = useMemo(() => {
+  const { chartColor, gradientId } = useMemo(() => {
     const activeFilters = Object.entries(platformFilters)
       .filter(([_, active]) => active)
       .map(([name]) => name);
 
     let color = 'hsl(160, 100%, 46%)'; // Neon bright teal
-    let glow = 'rgba(0, 255, 180, 0.25)';
     let gradId = 'gradient-mixed';
 
     if (activeFilters.length === 1) {
       const platform = activeFilters[0];
       if (platform === 'github') {
         color = 'var(--color-github)';
-        glow = 'rgba(var(--color-github-rgb), 0.25)';
         gradId = 'gradient-github';
       } else if (platform === 'gitlab') {
         color = 'var(--color-gitlab)';
-        glow = 'rgba(var(--color-gitlab-rgb), 0.25)';
         gradId = 'gradient-gitlab';
       } else if (platform === 'bitbucket') {
         color = 'var(--color-bitbucket)';
-        glow = 'rgba(var(--color-bitbucket-rgb), 0.25)';
         gradId = 'gradient-bitbucket';
       } else if (platform === 'local') {
         color = 'var(--color-local)';
-        glow = 'rgba(var(--color-local-rgb), 0.25)';
         gradId = 'gradient-local';
       } else if (platform === 'codeberg') {
         color = 'var(--color-codeberg)';
-        glow = 'rgba(var(--color-codeberg-rgb), 0.25)';
         gradId = 'gradient-codeberg';
+      } else if (platform === 'azure') {
+        color = 'var(--color-azure)';
+        gradId = 'gradient-azure';
       }
     }
 
-    return { chartColor: color, glowColor: glow, gradientId: gradId };
+    return { chartColor: color, gradientId: gradId };
   }, [platformFilters]);
 
   // 2. Extrai e consolida os commits dos últimos 30 dias com base no fuso e ano selecionado
@@ -85,6 +82,7 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
         bitbucket: 0,
         codeberg: 0,
         local: 0,
+        azure: 0,
       };
 
       const gh = platformFilters.github ? rawCommits.github : 0;
@@ -92,8 +90,9 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
       const bb = platformFilters.bitbucket ? rawCommits.bitbucket : 0;
       const cb = platformFilters.codeberg ? rawCommits.codeberg : 0;
       const lc = platformFilters.local ? rawCommits.local : 0;
+      const az = platformFilters.azure ? rawCommits.azure || 0 : 0;
 
-      const totalFiltered = gh + gl + bb + cb + lc;
+      const totalFiltered = gh + gl + bb + cb + lc + az;
 
       points.push({
         date: d,
@@ -107,6 +106,7 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
           bitbucket: bb,
           codeberg: cb,
           local: lc,
+          azure: az,
         },
       });
     }
@@ -222,8 +222,7 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
     return ticks;
   }, [maxCount]);
 
-  const handleMouseEnterPoint = (e: React.MouseEvent<SVGCircleElement>, p: any) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+  const handleMouseEnterPoint = (_e: React.MouseEvent<SVGCircleElement>, p: any) => {
     const dateObj = new Date(p.dateStr + 'T12:00:00.000Z');
     const formattedDate = dateObj.toLocaleDateString('pt-BR', {
       day: 'numeric',
@@ -234,11 +233,6 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
     setHoveredPoint({
       ...p,
       formattedDate,
-    });
-
-    setTooltipPos({
-      x: rect.left + window.scrollX - 90,
-      y: rect.top + window.scrollY - 150,
     });
   };
 
@@ -295,6 +289,11 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
               {hoveredPoint.breakdown.local > 0 && (
                 <span className="info-badge local">
                   <span className="badge-dot local"></span>Local: <strong>{hoveredPoint.breakdown.local}</strong>
+                </span>
+              )}
+              {hoveredPoint.breakdown.azure > 0 && (
+                <span className="info-badge azure">
+                  <span className="badge-dot azure"></span>Azure: <strong>{hoveredPoint.breakdown.azure}</strong>
                 </span>
               )}
             </div>

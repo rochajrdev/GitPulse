@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from './db.js';
 import { syncGitHubContributions } from './sync-contributions.js';
 import { syncGitHubCommits } from './sync-github.js';
+import { syncAzureCommits } from './sync-azure.js';
 
 const server = fastify({
   logger: true,
@@ -218,7 +219,7 @@ server.post('/api/v1/users/:username/sync', async (request, reply) => {
       server.log.error('Erro ao sincronizar contribution calendar: ' + err.message);
     }
 
-    // 2. Sincroniza commits individuais dos repos
+    // 2. Sincroniza commits individuais dos repos do GitHub
     let commitStats = { totalInserted: 0, totalSkipped: 0 };
     try {
       commitStats = await syncGitHubCommits(user.username, user.name, email);
@@ -226,11 +227,25 @@ server.post('/api/v1/users/:username/sync', async (request, reply) => {
       server.log.error('Erro ao sincronizar commits do GitHub: ' + err.message);
     }
 
+    // 3. Sincroniza commits do Azure DevOps se as credenciais estiverem configuradas
+    let azureStats = { totalInserted: 0, totalSkipped: 0 };
+    const hasAzure = !!(process.env.AZURE_ORGANIZATION && process.env.AZURE_PROJECT && process.env.AZURE_PAT);
+    if (hasAzure) {
+      try {
+        azureStats = await syncAzureCommits(user.username, user.name, email);
+      } catch (err: any) {
+        server.log.error('Erro ao sincronizar commits do Azure: ' + err.message);
+      }
+    }
+
     return {
       success: true,
-      message: 'Sincronização com o GitHub concluída com sucesso!',
+      message: hasAzure 
+        ? 'Sincronização com o GitHub e Azure DevOps concluída com sucesso!'
+        : 'Sincronização com o GitHub concluída com sucesso!',
       contributionStats,
       commitStats,
+      azureStats: hasAzure ? azureStats : undefined,
     };
   } catch (error) {
     reply.code(500);

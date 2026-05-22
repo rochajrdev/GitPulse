@@ -44,6 +44,7 @@ interface DailyCommit {
   bitbucket: number;
   codeberg: number;
   local: number;
+  azure?: number;
 }
 
 interface Summary {
@@ -80,10 +81,11 @@ export default function App() {
     bitbucket: true,
     codeberg: true,
     local: true,
+    azure: true,
   });
 
   // Estado para Guia de Integração
-  const [activeIntTab, setActiveIntTab] = useState<'github' | 'gitlab' | 'bitbucket' | 'codeberg' | 'local'>('github');
+  const [activeIntTab, setActiveIntTab] = useState<'github' | 'gitlab' | 'bitbucket' | 'codeberg' | 'local' | 'azure'>('github');
 
   // Referência do Tooltip Portal
   const [tooltip, setTooltip] = useState<{
@@ -332,7 +334,7 @@ export default function App() {
     // 1. Filtra as estatísticas de commits diários
     const daily: Record<string, DailyCommit> = {};
     let total = 0;
-    const platformCount = { github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0 };
+    const platformCount = { github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0, azure: 0 };
 
     Object.entries(userData.dailyCommits).forEach(([dateStr, commit]) => {
       let filteredDayCount = 0;
@@ -341,8 +343,9 @@ export default function App() {
       let bb = platformFilters.bitbucket ? commit.bitbucket : 0;
       let cb = platformFilters.codeberg ? commit.codeberg : 0;
       let lc = platformFilters.local ? commit.local : 0;
+      let az = platformFilters.azure ? (commit as any).azure || 0 : 0;
 
-      filteredDayCount = gh + gl + bb + cb + lc;
+      filteredDayCount = gh + gl + bb + cb + lc + az;
 
       if (filteredDayCount > 0) {
         daily[dateStr] = {
@@ -351,7 +354,8 @@ export default function App() {
           gitlab: gl,
           bitbucket: bb,
           codeberg: cb,
-          local: lc
+          local: lc,
+          azure: az,
         };
 
         total += filteredDayCount;
@@ -360,6 +364,7 @@ export default function App() {
         platformCount.bitbucket += bb;
         platformCount.codeberg += cb;
         platformCount.local += lc;
+        platformCount.azure += az;
       }
     });
 
@@ -998,6 +1003,13 @@ export default function App() {
                     <div className="filter-indicator"></div>
                     Local
                   </button>
+                  <button 
+                    className={`filter-btn ${platformFilters.azure ? 'active azure' : ''}`}
+                    onClick={() => setPlatformFilters(prev => ({ ...prev, azure: !prev.azure }))}
+                  >
+                    <div className="filter-indicator"></div>
+                    Azure DevOps
+                  </button>
                 </div>
               </div>
 
@@ -1182,6 +1194,12 @@ export default function App() {
               >
                 Commits Locais (Script)
               </button>
+              <button 
+                className={`int-tab ${activeIntTab === 'azure' ? 'active' : ''}`}
+                onClick={() => setActiveIntTab('azure')}
+              >
+                Azure DevOps (Local)
+              </button>
             </div>
 
             {activeIntTab === 'github' && (
@@ -1356,6 +1374,37 @@ export default function App() {
                       {`  -d "$PAYLOAD" \\ \n`}
                       {`  ${backendUrl}/api/v1/webhooks/${userData.user.webhookToken}`}
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeIntTab === 'azure' && (
+              <div className="animate-fade-in">
+                <p className="step-desc" style={{ fontSize: '0.92rem', marginBottom: '20px' }}>
+                  A sincronização com o <strong>Azure DevOps (Azure Repos)</strong> é processada de forma local e 100% privada pelo backend do GitPulse.
+                </p>
+                <div className="guide-step">
+                  <div className="step-num">1</div>
+                  <div className="step-content">
+                    <span className="step-title">Configure as Credenciais no Backend</span>
+                    <p className="step-desc">
+                      Abra o arquivo <code>backend/.env</code> do seu GitPulse local e configure as variáveis abaixo com o nome da sua organização, projeto e o PAT (Personal Access Token) gerado:
+                    </p>
+                    <div className="code-block" style={{ fontSize: '0.8rem', lineHeight: '1.5' }}>
+                      {`AZURE_ORGANIZATION="SuaOrganizacao"\n`}
+                      {`AZURE_PROJECT="SeuProjeto"\n`}
+                      {`AZURE_PAT="seu_token_pat_do_azure_devops"`}
+                    </div>
+                  </div>
+                </div>
+                <div className="guide-step">
+                  <div className="step-num">2</div>
+                  <div className="step-content">
+                    <span className="step-title">Execute a Sincronização Geral</span>
+                    <p className="step-desc">
+                      Clique no botão <strong>Sincronizar</strong> no topo direito da dashboard. O backend do GitPulse varrerá todos os repositórios do seu projeto no Azure DevOps, baixará seus commits e atualizará o heatmap e gráficos dinamicamente!
+                    </p>
                   </div>
                 </div>
               </div>
