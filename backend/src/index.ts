@@ -438,7 +438,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     return { error: 'Usuário não encontrado' };
   }
 
-  // Determina o intervalo de datas
+  // Determina o intervalo de datas para o ano selecionado
   let startOfRange: Date;
   let endOfRange: Date;
   let startDateStr: string;
@@ -461,13 +461,26 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     endDateStr = `${currentYear}-12-31`;
   }
 
-  // Busca todos os commits do período especificado
+  // Define também o intervalo dos últimos 30 dias de forma independente
+  const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0, 0);
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+  const todayEndStr = todayEnd.toISOString().split('T')[0];
+
+  // A data inicial da busca é o mínimo entre startOfRange e thirtyDaysAgo para unificar as queries
+  const queryStart = startOfRange < thirtyDaysAgo ? startOfRange : thirtyDaysAgo;
+  // A data final da busca é o máximo entre endOfRange e todayEnd
+  const queryEnd = endOfRange > todayEnd ? endOfRange : todayEnd;
+  const queryStartStr = queryStart.toISOString().split('T')[0];
+  const queryEndStr = queryEnd.toISOString().split('T')[0];
+
+  // Busca todos os commits cobrindo todo o intervalo ampliado
   const commits = await prisma.commit.findMany({
     where: {
       userId: user.id,
       timestamp: {
-        gte: startOfRange,
-        lte: endOfRange,
+        gte: queryStart,
+        lte: queryEnd,
       },
     },
     orderBy: {
@@ -475,26 +488,27 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     },
   });
 
-  // Tenta usar ContributionDay (dados exatos do GitHub) como fonte principal do heatmap
+  // Busca contribuições cobrindo todo o intervalo ampliado
   const contributionDays = await prisma.contributionDay.findMany({
     where: {
       userId: user.id,
       source: 'github',
       date: {
-        gte: startDateStr,
-        lte: endDateStr,
+        gte: queryStartStr,
+        lte: queryEndStr,
       },
     },
     orderBy: { date: 'asc' },
   });
 
-  const dailyCommits: Record<string, {
+  const allDailyCommits: Record<string, {
     total: number;
     github: number;
     gitlab: number;
     bitbucket: number;
     codeberg: number;
     local: number;
+    azure: number;
   }> = {};
 
   const platformCount: Record<string, number> = {
@@ -503,52 +517,121 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     bitbucket: 0,
     codeberg: 0,
     local: 0,
+    azure: 0,
   };
 
   if (contributionDays.length > 0) {
     // ✅ MODO PRECISO: usar dados exatos do GitHub Contribution Calendar
+    // Para as outras plataformas (gitlab, bitbucket, azure, local), lemos
+    // os commits individuais do banco de dados para que não fiquem de fora!
+    commits.forEach((commit: any) => {
+      const localDate = new Date(commit.timestamp);
+      const yearVal = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const dateStr = `${yearVal}-${month}-${day}`;
+
+      const p = commit.platform.toLowerCase();
+      if (p === 'github') return; // Ignora github pois já vem preciso do contributionDays
+
+      if (!allDailyCommits[dateStr]) {
+        allDailyCommits[dateStr] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0, azure: 0 };
+      }
+
+      allDailyCommits[dateStr].total++;
+      if (p in allDailyCommits[dateStr]) {
+        allDailyCommits[dateStr][p as keyof typeof allDailyCommits[string]]++;
+      } else {
+        allDailyCommits[dateStr].local++;
+      }
+
+      // Só incrementa platformCount se o commit estiver dentro do ano selecionado!
+      const isWithinYearRange = commit.timestamp >= startOfRange && commit.timestamp <= endOfRange;
+      if (isWithinYearRange) {
+        if (p in platformCount) {
+          platformCount[p]++;
+        } else {
+          platformCount.local++;
+        }
+      }
+    });
+
+    // Agora adiciona os dados precisos do GitHub Contribution Days
     contributionDays.forEach((cd: any) => {
-      dailyCommits[cd.date] = {
-        total:     cd.count,
-        github:    cd.count, // todos os dados vêm do GitHub
-        gitlab:    0,
-        bitbucket: 0,
-        codeberg:  0,
-        local:     0,
-      };
-      platformCount.github += cd.count;
+      if (!allDailyCommits[cd.date]) {
+        allDailyCommits[cd.date] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0, azure: 0 };
+      }
+      allDailyCommits[cd.date].github = cd.count;
+      allDailyCommits[cd.date].total += cd.count;
+
+      // Só incrementa platformCount se o dia estiver dentro do ano selecionado!
+      const isWithinYearRangeStr = cd.date >= startDateStr && cd.date <= endDateStr;
+      if (isWithinYearRangeStr) {
+        platformCount.github += cd.count;
+      }
     });
   } else {
     // ⚠️ FALLBACK: usar commits individuais se não houver contribution calendar
     commits.forEach((commit: any) => {
       const localDate = new Date(commit.timestamp);
-      const year = localDate.getFullYear();
+      const yearVal = localDate.getFullYear();
       const month = String(localDate.getMonth() + 1).padStart(2, '0');
       const day = String(localDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+      const dateStr = `${yearVal}-${month}-${day}`;
 
-      if (!dailyCommits[dateStr]) {
-        dailyCommits[dateStr] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0 };
+      if (!allDailyCommits[dateStr]) {
+        allDailyCommits[dateStr] = { total: 0, github: 0, gitlab: 0, bitbucket: 0, codeberg: 0, local: 0, azure: 0 };
       }
 
-      dailyCommits[dateStr].total++;
+      allDailyCommits[dateStr].total++;
 
       const p = commit.platform.toLowerCase();
-      if (p in dailyCommits[dateStr]) {
-        dailyCommits[dateStr][p as keyof typeof dailyCommits[string]]++;
+      if (p in allDailyCommits[dateStr]) {
+        allDailyCommits[dateStr][p as keyof typeof allDailyCommits[string]]++;
       } else {
-        dailyCommits[dateStr].local++;
+        allDailyCommits[dateStr].local++;
       }
 
-      if (p in platformCount) {
-        platformCount[p]++;
-      } else {
-        platformCount.local++;
+      // Só incrementa platformCount se o commit estiver dentro do ano selecionado!
+      const isWithinYearRange = commit.timestamp >= startOfRange && commit.timestamp <= endOfRange;
+      if (isWithinYearRange) {
+        if (p in platformCount) {
+          platformCount[p]++;
+        } else {
+          platformCount.local++;
+        }
       }
     });
   }
 
-  // Determina a plataforma mais ativa
+  // Separa em dailyCommits (para o ano filtrado) e last30DaysCommits (para o ritmo de atividade)
+  const dailyCommits: Record<string, typeof allDailyCommits[string]> = {};
+  const last30DaysCommits: Record<string, typeof allDailyCommits[string]> = {};
+
+  // Preenche dailyCommits
+  Object.entries(allDailyCommits).forEach(([dateStr, data]) => {
+    if (dateStr >= startDateStr && dateStr <= endDateStr) {
+      dailyCommits[dateStr] = data;
+    }
+  });
+
+  // Inicializa e preenche last30DaysCommits de forma a nunca conter lacunas
+  for (let i = 30; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    last30DaysCommits[dateStr] = allDailyCommits[dateStr] || {
+      total: 0,
+      github: 0,
+      gitlab: 0,
+      bitbucket: 0,
+      codeberg: 0,
+      local: 0,
+      azure: 0,
+    };
+  }
+
+  // Determina a plataforma mais ativa com base apenas no ano selecionado
   let mostActivePlatform = 'Nenhum';
   let maxCommits = 0;
   Object.entries(platformCount).forEach(([platform, count]) => {
@@ -561,8 +644,6 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
   // ==========================================
   // CÁLCULO DAS SEQUÊNCIAS (STREAKS)
   // ==========================================
-  
-  // Extrai todas as datas ativas ordenadas
   const activeDays = Object.keys(dailyCommits).sort();
   const activeDaysSet = new Set(activeDays);
 
@@ -600,7 +681,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     }
 
     // 2. Calcula Current Streak
-    // Obtém o dia de hoje (em UTC ou no fuso correto do servidor)
+    // Obtém o dia de hoje
     const todayStr = new Date().toISOString().split('T')[0];
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -680,7 +761,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
     years.push(y);
   }
 
-  const totalCommits = commits.length;
+  const totalCommits = commits.filter((c: any) => c.timestamp >= startOfRange && c.timestamp <= endOfRange).length;
   const activeDaysCount = activeDays.length;
 
   return {
@@ -699,6 +780,7 @@ server.get('/api/v1/users/:username/summary', async (request, reply) => {
       platformBreakdown: platformCount,
     },
     dailyCommits,
+    last30DaysCommits,
     years,
   };
 });

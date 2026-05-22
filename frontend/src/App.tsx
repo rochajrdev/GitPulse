@@ -51,6 +51,7 @@ interface Summary {
   user: User;
   stats: Stats;
   dailyCommits: Record<string, DailyCommit>;
+  last30DaysCommits: Record<string, DailyCommit>;
   years: number[];
 }
 
@@ -1072,8 +1073,7 @@ export default function App() {
 
             {/* GRÁFICO DE ATIVIDADE */}
             <CommitLineChart
-              dailyCommits={userData.dailyCommits}
-              selectedYear={selectedYear}
+              dailyCommits={userData.last30DaysCommits || userData.dailyCommits}
               platformFilters={platformFilters}
             />
 

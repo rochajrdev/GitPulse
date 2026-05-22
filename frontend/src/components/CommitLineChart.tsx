@@ -13,11 +13,10 @@ interface DailyCommit {
 
 interface CommitLineChartProps {
   dailyCommits: Record<string, DailyCommit>;
-  selectedYear: number | 'last-year';
   platformFilters: Record<string, boolean>;
 }
 
-export default function CommitLineChart({ dailyCommits, selectedYear, platformFilters }: CommitLineChartProps) {
+export default function CommitLineChart({ dailyCommits, platformFilters }: CommitLineChartProps) {
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
 
   // 1. Determina a cor do gráfico baseada nos filtros ativos
@@ -55,18 +54,11 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
     return { chartColor: color, gradientId: gradId };
   }, [platformFilters]);
 
-  // 2. Extrai e consolida os commits dos últimos 30 dias com base no fuso e ano selecionado
+  // 2. Extrai e consolida os commits dos últimos 30 dias (sempre com base na data atual)
   const chartData = useMemo(() => {
     const points = [];
     const now = new Date();
-    let endDate: Date;
-
-    if (selectedYear === 'last-year') {
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else {
-      const yearNum = typeof selectedYear === 'string' ? parseInt(selectedYear) : selectedYear;
-      endDate = new Date(yearNum, 11, 31);
-    }
+    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     for (let i = 30; i >= 0; i--) {
       const d = new Date(endDate);
@@ -111,7 +103,7 @@ export default function CommitLineChart({ dailyCommits, selectedYear, platformFi
       });
     }
     return points;
-  }, [dailyCommits, selectedYear, platformFilters]);
+  }, [dailyCommits, platformFilters]);
 
   // 3. Calcula o valor máximo do eixo Y
   const maxCount = useMemo(() => {
